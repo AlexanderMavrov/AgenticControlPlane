@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "workflow-editor",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8765", "-d", "projects/italy_games/tasks/agentic-control-plane/dist/.agent/tools"],
+      "port": 8765
+    },
+    {
+      "name": "trace-viewer",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8766", "-d", "tasks/agentic-control-plane/dist/.agent/tools"],
+      "port": 8766
+    }
+  ]
+}

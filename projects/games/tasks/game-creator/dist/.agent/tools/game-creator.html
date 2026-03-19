@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Creator</title>
+<style>
+:root {
+  --bg: #f4f6f9; --bg-card: #ffffff; --bg-hover: #eef0f5; --bg-section: #f8f9fb;
+  --text: #1c1f2e; --text-secondary: #6b7280; --text-muted: #9ca3af;
+  --border: #e2e6ec; --accent: #4a6fe8; --accent-light: #eaeffb;
+  --green: #2f9e5a; --green-bg: #edf7f2;
+  --red: #d94747;   --red-bg: #fdeaea;
+  --amber: #b87316; --amber-bg: #fef5e4;
+  --blue: #3878c2;  --blue-bg: #e8f0fb;
+  --purple: #7048c8;--purple-bg: #f0ebff;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 12px; --radius-sm: 7px; --radius-xs: 4px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06); --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] {
+  --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2128; --bg-section: #13181f;
+  --text: #e6edf3; --text-secondary: #8b949e; --text-muted: #6e7681;
+  --border: #30363d; --accent: #7090f4; --accent-light: #1a2340;
+  --green: #3fb870; --green-bg: #0d2618;
+  --red: #f07070;   --red-bg: #2d1010;
+  --amber: #d4a44a; --amber-bg: #2a1f0a;
+  --blue: #6fa8e0;  --blue-bg: #0e1e33;
+  --purple: #a07de8;--purple-bg: #1a1030;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); font-size: 14px; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+
+/* HEADER */
+.header { position: sticky; top: 0; z-index: 100; background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); }
+.header-left { display: flex; align-items: center; gap: 10px; }
+.logo { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.logo-icon { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; }
+.header-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); transition: background 0.15s, border-color 0.15s; text-decoration: none; }
+.btn:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { filter: brightness(1.1); background: var(--accent); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; }
+.btn-danger { color: var(--red); border-color: var(--red-bg); }
+.btn-danger:hover { background: var(--red-bg); }
+
+/* MAIN */
+.main { max-width: 860px; margin: 32px auto; padding: 0 24px 80px; }
+
+/* WIZARD STEPS */
+.wizard-steps { display: flex; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
+.wstep { display: flex; align-items: center; gap: 8px; flex: 1; position: relative; cursor: pointer; }
+.wstep:not(:last-child)::after { content: ''; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 24px; height: 2px; background: var(--border); border-radius: 1px; }
+.wstep.done:not(:last-child)::after { background: var(--green); }
+.wstep-num { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; transition: all 0.2s; background: var(--bg); }
+.wstep.active .wstep-num { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.wstep.done .wstep-num { border-color: var(--green); color: #fff; background: var(--green); }
+.wstep-label { font-size: 12px; color: var(--text-muted); font-weight: 500; line-height: 1.2; }
+.wstep.active .wstep-label { color: var(--accent); font-weight: 600; }
+.wstep.done .wstep-label { color: var(--green); }
+
+/* CARD */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+.card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg-section); }
+.card-title { font-size: 14px; font-weight: 600; }
+.card-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.card-body { padding: 20px; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+/* SECTION LABEL */
+.section-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; margin-top: 18px; }
+.section-label:first-child { margin-top: 0; }
+
+/* FORM */
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+label .req { color: var(--red); margin-left: 2px; }
+input[type=text], input[type=number], select, textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font); font-size: 13px; background: var(--bg-card); color: var(--text); transition: border-color 0.15s, box-shadow 0.15s; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,111,232,0.1); }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(217,71,71,0.08); }
+select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+.field-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.field-error { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
+.field-error.visible { display: block; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* DERIVED NAMES */
+.derived-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.derived-chip { padding: 5px 10px; border-radius: var(--radius-xs); background: var(--accent-light); border: 1px solid var(--accent); font-size: 12px; font-family: var(--mono); }
+.derived-chip .dc-label { font-family: var(--font); color: var(--text-muted); margin-right: 4px; }
+.derived-chip .dc-val { color: var(--accent); font-weight: 600; }
+
+/* GAME GRID */
+.game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.game-card { border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px; cursor: pointer; transition: border-color 0.15s, background 0.15s; text-align: center; background: var(--bg); }
+.game-card:hover, .game-card.selected { border-color: var(--accent); background: var(--accent-light); }
+.game-card.selected .gc-name { color: var(--accent); }
+.gc-icon { font-size: 24px; margin-bottom: 6px; }
+.gc-name { font-size: 12px; font-weight: 600; }
+.gc-snake { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+/* INTEGRATION CHIPS */
+.integration-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.integration-chip { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--bg); transition: border-color 0.15s, background 0.15s; user-select: none; }
+.integration-chip:hover, .integration-chip.checked { border-color: var(--accent); background: var(--accent-light); }
+.integration-chip input { display: none; }
+.integration-chip .ic-label { font-size: 13px; font-weight: 600; }
+.integration-chip .ic-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.15s; }
+.integration-chip.checked .ic-dot { background: var(--accent); }
+
+/* SYMBOL CHIPS */
+.symbol-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.symbol-chip { padding: 3px 10px; border-radius: 10px; font-size: 12px; font-family: var(--mono); font-weight: 600; background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); }
+.symbol-chip.wild { background: var(--amber-bg); color: var(--amber); border-color: var(--amber); }
+.symbol-chip.scatter { background: var(--purple-bg); color: var(--purple); border-color: var(--purple); }
+
+/* ASSETS MODE */
+.assets-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.assets-option { border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 16px; cursor: pointer; transition: border-color 0.15s, background 0.15s; background: var(--bg); }
+.assets-option:hover { border-color: var(--accent); background: var(--accent-light); }
+.assets-option.selected { border-color: var(--accent); background: var(--accent-light); }
+.ao-icon { font-size: 22px; margin-bottom: 8px; }
+.ao-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.ao-title.selected { color: var(--accent); }
+.ao-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.assets-option.selected .ao-desc { color: var(--text-secondary); }
+
+/* MAPPING TABLE */
+.mapping-table { width: 100%; border-collapse: collapse; }
+.mapping-table th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.mapping-table td { padding: 5px 4px; }
+.mapping-table td:first-child { padding-left: 10px; }
+.mapping-table td:last-child { padding-right: 10px; }
+.mapping-table tr:hover td { background: var(--bg-hover); }
+.mapping-table input { font-family: var(--mono); }
+.mapping-arrow { text-align: center; color: var(--text-muted); font-size: 16px; padding: 0 6px; }
+.remove-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 16px; padding: 2px 6px; border-radius: var(--radius-xs); line-height: 1; }
+.remove-btn:hover { color: var(--red); background: var(--red-bg); }
+.table-add-row { padding: 8px 10px 4px; }
+
+/* INFO BOX */
+.info-box { border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; display: flex; gap: 8px; align-items: flex-start; margin-bottom: 14px; }
+.info-box.info { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue); }
+.info-box.warn { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+.info-box.success { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+.info-box .ib-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.info-box .ib-text { line-height: 1.5; }
+
+/* JSON PREVIEW */
+.json-preview { background: var(--bg-section); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6; max-height: 400px; overflow-y: auto; white-space: pre; color: var(--text); }
+.json-key { color: var(--accent); }
+.json-str { color: var(--green); }
+.json-num { color: var(--amber); }
+.json-bool { color: var(--purple); }
+.json-null { color: var(--text-muted); }
+
+/* SUMMARY */
+.summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.summary-table td { padding: 7px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.summary-table td:first-child { color: var(--text-secondary); font-weight: 600; width: 160px; }
+.summary-table .st-mono { font-family: var(--mono); }
+.st-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+
+/* NAV */
+.nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.nav-row .nav-right { display: flex; gap: 8px; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+@media (max-width: 600px) { .assets-options { grid-template-columns: 1fr; } .game-grid { grid-template-columns: 1fr 1fr; } .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">
+      <div class="logo-icon">GC</div>
+      <div>
+        <div>Game Creator</div>
+        <div class="header-sub">Alpha Family · VLT Games</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-sm" onclick="resetWizard()">↺ Reset</button>
+    <button class="btn btn-sm btn-icon" onclick="toggleTheme()" id="themeBtn">🌙</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- WIZARD PROGRESS -->
+  <div class="wizard-steps">
+    <div class="wstep active" id="ws1" onclick="goStep(1)"><div class="wstep-num" id="wn1">1</div><div class="wstep-label">Прототип</div></div>
+    <div class="wstep" id="ws2" onclick="goStep(2)"><div class="wstep-num" id="wn2">2</div><div class="wstep-label">Ново Име</div></div>
+    <div class="wstep" id="ws3" onclick="goStep(3)"><div class="wstep-num" id="wn3">3</div><div class="wstep-label">Math Файл</div></div>
+    <div class="wstep" id="ws4" onclick="goStep(4)"><div class="wstep-num" id="wn4">4</div><div class="wstep-label">Настройки</div></div>
+    <div class="wstep" id="ws5" onclick="goStep(5)"><div class="wstep-num" id="wn5">5</div><div class="wstep-label">Assets</div></div>
+    <div class="wstep" id="ws6" onclick="goStep(6)"><div class="wstep-num" id="wn6">6</div><div class="wstep-label">Export</div></div>
+  </div>
+
+  <!-- ── STEP 1: PROTOTYPE ── -->
+  <div class="step-panel active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Стъпка 1 — Избор на игра-прототип</div>
+        <div class="card-sub">Новата игра ще бъде клонирана от избрания прототип</div>
+      </div>
+      <div class="card-body">
+        <div class="section-label">Известни игри</div>
+        <div class="game-grid" id="gameGrid"></div>
+        <div class="section-label">Или въведи ръчно</div>
+        <div class="field">
+          <label>Snake case название</label>
+          <input type="text" id="customPrototype" placeholder="my_custom_game" oninput="onCustomPrototype()" />
+          <div class="field-hint">Попълни само ако играта не е в списъка по-горе</div>
+        </div>
+        <div class="nav-row">
+          <div></div>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(1)">Напред →</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: NEW NAME ── -->
+  <div class="step-panel" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Стъпка 2 — Ново Име на Играта</div>
+        <div class="card-sub">Определя имената на директориите, класовете и таргетите</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Snake case <span class="req">*</span></label>
+          <input type="text" id="newGameSnake" placeholder="dragon_fortune" oninput="onNameChange()" />
+          <div class="field-hint">Само малки букви, цифри и _. Пример: <code>dragon_fortune</code></div>
+          <div class="field-error" id="snakeErr">Невалидно — само a-z, 0-9 и _</div>
+        </div>
+        <div class="field">
+          <label>Display название</label>
+          <input type="text" id="newGameDisplay" placeholder="Dragon Fortune" oninput="onDisplayChange()" />
+        </div>
+        <div id="derivedNames" style="display:none;">
+          <div class="section-label">Автоматично извлечени имена</div>
+          <div class="derived-row">
+            <div class="derived-chip"><span class="dc-label">PascalCase:</span><span class="dc-val" id="dcPascal">—</span></div>
+            <div class="derived-chip"><span class="dc-label">Library:</span><span class="dc-val" id="dcLib">—</span></div>
+            <div class="derived-chip"><span class="dc-label">Astro app:</span><span class="dc-val" id="dcAstro">—</span></div>
+          </div>
+        </div>
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(1)">← Назад</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(2)">Напред →</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: MATH FILE ── -->
+  <div class="step-panel" id="step3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Стъпка 3 — Math Файл на Новата Игра</div>
+        <div class="card-sub">Задължителен — дефинира символите, RTP и математиката</div>
+      </div>
+      <div class="card-body">
+        <div class="info-box info">
+          <span class="ib-icon">ℹ</span>
+          <span class="ib-text">
+            Math файлът е сертифицираният математически модел на играта. Той съдържа символите,
+            reel strips, paytable и вероятностите. Не може да се генерира автоматично —
+            трябва да е подготвен от математик.<br><br>
+            Намери го в: <code>resources/{прототип}/math/var_*.json</code>
+          </span>
+        </div>
+
+        <div class="section-label">Зареди math файла</div>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <label class="btn btn-sm" style="cursor:pointer; margin:0;">
+            📂 Избери math JSON файл
+            <input type="file" accept=".json" id="mathFileInput" style="display:none" onchange="loadMathFile(event)" />
+          </label>
+          <span id="mathFileStatus" style="font-size:12px; color:var(--text-muted);"></span>
+        </div>
+
+        <div class="field">
+          <label>Пълен path до math файла <span class="req">*</span></label>
+          <input type="text" id="mathFilePath" placeholder="C:/mklinks/games/resources/burning_hot_coins/math/var_8407.json" oninput="onMathPathChange()" />
+          <div class="field-hint">Нужен е на workflow-а за да намери и копира файла. Ако си го заредил с picker-а, браузърът не дава пълния path — допълни директорията ръчно. Напр. <code>C:/mklinks/games/resources/burning_hot_coins/math/var_8407.json</code></div>
+        </div>
+
+        <div id="mathSymbolsBox" style="display:none;">
+          <div class="section-label">Символи в тази игра</div>
+          <div class="symbol-list" id="symbolList"></div>
+        </div>
+
+        <div class="section-label">Регистрация в Modules.json</div>
+        <div class="two-col">
+          <div class="field">
+            <label>Variant ID <span class="req">*</span></label>
+            <input type="text" id="mathVariantId" placeholder="var_8407" />
+            <div class="field-hint">Идентификатор за <code>{Game}Modules.json</code></div>
+          </div>
+          <div class="field">
+            <label>RTP <span class="req">*</span></label>
+            <input type="number" id="mathRtp" step="0.0001" min="0" max="1" placeholder="0.8407" />
+            <div class="field-hint">Напр. <code>0.8407</code> = 84.07%</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Destination path (в resources директорията)</label>
+          <input type="text" id="mathDestFile" placeholder="math/var_8407.json" />
+          <div class="field-hint">Относителен path — накъде да се копира в <code>resources/{нова_игра}/</code></div>
+        </div>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(2)">← Назад</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(3)">Напред →</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: SETTINGS ── -->
+  <div class="step-panel" id="step4">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Стъпка 4 — Настройки</div>
+        <div class="card-sub">Source code path и integrations</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Games source root <span class="req">*</span></label>
+          <input type="text" id="gamesRoot" placeholder="C:/mklinks/games" />
+          <div class="field-hint">Root директорията на games проекта</div>
+        </div>
+        <div class="section-label">Integrations</div>
+        <div class="info-box info">
+          <span class="ib-icon">ℹ</span>
+          <span class="ib-text">За избраните integrations ще се генерират integration app файлове (.cpp + CMakeLists.txt).</span>
+        </div>
+        <div class="integration-grid" id="integrationsGrid"></div>
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(3)">← Назад</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(4)">Напред →</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 5: ASSETS ── -->
+  <div class="step-panel" id="step5">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Стъпка 5 — Assets</div>
+        <div class="card-sub">Как да се обработят ресурсите на новата игра</div>
+      </div>
+      <div class="card-body">
+        <div class="section-label">Режим</div>
+        <div class="assets-options">
+          <div class="assets-option selected" id="ao_reuse" onclick="setAssetsMode('reuse')">
+            <div class="ao-icon">📋</div>
+            <div class="ao-title" id="ao_reuse_title">Reuse prototype assets</div>
+            <div class="ao-desc">
+              Resources-ите от прототипа се копират 1:1.
+              idata/ файловете работят коректно по числови ID-та —
+              не е нужна допълнителна конфигурация.
+            </div>
+          </div>
+          <div class="assets-option" id="ao_new" onclick="setAssetsMode('new')">
+            <div class="ao-icon">🎨</div>
+            <div class="ao-title" id="ao_new_title">Нови assets</div>
+            <div class="ao-desc">
+              Художникът е подготвил нови sprites/audio.
+              Посочи директорията — файловете ще бъдат overlay-нати
+              върху копираните resources.
+            </div>
+          </div>
+        </div>
+
+        <!-- shown only when mode = 'new' -->
+        <div id="newAssetsSection" style="display:none;">
+          <div class="field">
+            <label>Assets директория</label>
+            <input type="text" id="resourcesDir" placeholder="C:/my_assets/dragon_fortune" />
+            <div class="field-hint">Файловете от тази директория се overlay-ват върху <code>resources/{нова_игра}/</code> след копирането на прототипа.</div>
+          </div>
+          <div class="two-col" style="margin-bottom:0;">
+            <div class="field">
+              <label>Game prefix (нова игра) <span class="req">*</span></label>
+              <input type="text" id="gamePrefix" placeholder="df" oninput="onPrefixChange()" />
+              <div class="field-hint">Напр. <code>bh</code> за burning_hot_coins, <code>df</code> за dragon_fortune. За именуване на asset файловете.</div>
+            </div>
+            <div class="field">
+              <label>Prototype prefix (прототип)</label>
+              <input type="text" id="prototypePrefixHint" placeholder="bh" />
+              <div class="field-hint">Prefix на прототипа. Ако е зададен, workflow-ът ще замести автоматично <code>{prototype_prefix}_</code> → <code>{game_prefix}_</code> в <strong>всички</strong> RSS манифести (не само символните).</div>
+            </div>
+          </div>
+
+          <!-- Per-symbol resource preview -->
+          <div id="symbolResourcesBox" style="display:none; margin-top:16px;">
+            <div class="section-label">Очаквани ресурси по символ</div>
+            <div class="info-box info" style="margin-top:0;">
+              <span class="ib-icon">ℹ</span>
+              <span class="ib-text">
+                Пътищата са генерирани автоматично от <strong>game prefix</strong> + <strong>символно име</strong>.
+                Ако assets директорията следва тази конвенция, workflow-ът ще намери файловете автоматично.
+                Редактирай ако имената се различават.
+              </span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="mapping-table" id="symbolResourcesTable">
+                <thead>
+                  <tr>
+                    <th style="width:90px;">Символ</th>
+                    <th style="width:30px;"></th>
+                    <th>Sprite (.dds)</th>
+                    <th>Anim папка</th>
+                    <th>Sound (.wav)</th>
+                  </tr>
+                </thead>
+                <tbody id="symbolResourcesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(4)">← Назад</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(5)">Напред →</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 6: EXPORT ── -->
+  <div class="step-panel" id="step6">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Стъпка 6 — Преглед и Export</div>
+        <div class="card-sub">Конфигурацията е готова за workflow</div>
+      </div>
+      <div class="card-body">
+        <div class="section-label">Обобщение</div>
+        <table class="summary-table" id="summaryTable"></table>
+
+        <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>JSON Config</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm" onclick="copyConfig()">⎘ Копирай</button>
+            <button class="btn btn-sm btn-primary" onclick="downloadConfig()">↓ Download</button>
+          </div>
+        </div>
+        <div class="json-preview" id="jsonPreview"></div>
+
+        <div class="info-box success" style="margin-top:16px;">
+          <span class="ib-icon">✓</span>
+          <span class="ib-text"><strong>Config е готов.</strong> Запази JSON файла и го подай на <code>game-creator</code> workflow-а.</span>
+        </div>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(5)">← Назад</button>
+          <div class="nav-right"><button class="btn btn-sm" onclick="resetWizard()">Нова игра</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state = {
+  currentStep: 1, maxReached: 1,
+  prototype: '',
+  newGameSnake: '', newGameDisplay: '',
+  mathFile: { sourcePath: '', variantId: '', rtp: '', destFile: '', symbolNames: [], wildId: null, scatterIds: [] },
+  gamesRoot: 'C:/mklinks/games',
+  integrations: ['astro', 'playground', 'inspired'],
+  assetsMode: 'reuse',   // 'reuse' | 'new'
+  resourcesDir: '',
+  gamePrefix: '',
+  prototypePrefixHint: '',
+  symbolResources: [],
+  rssMapping: []
+};
+
+const KNOWN_GAMES = [
+  { snake: 'burning_hot_coins',    label: 'Burning Hot Coins',    icon: '🔥' },
+  { snake: 'nordic_rush',          label: 'Nordic Rush',          icon: '⚡' },
+  { snake: 'rise_of_ra',           label: 'Rise of Ra',           icon: '☀' },
+  { snake: 'joker_reels_coins_10', label: 'Joker Reels Coins 10', icon: '🃏' },
+];
+const ALL_INTEGRATIONS = [
+  { id: 'astro',      label: 'Astro'      },
+  { id: 'playground', label: 'Playground' },
+  { id: 'inspired',   label: 'Inspired'   },
+];
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  renderGameGrid();
+  renderIntegrations();
+  const saved = localStorage.getItem('gc-theme');
+  if (saved === 'dark') applyTheme('dark');
+};
+
+// ─── THEME ───────────────────────────────────────────────────────────────────
+function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t === 'dark' ? 'dark' : '';
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '☀' : '🌙';
+  localStorage.setItem('gc-theme', t);
+}
+
+// ─── STEP 1 ──────────────────────────────────────────────────────────────────
+function renderGameGrid() {
+  document.getElementById('gameGrid').innerHTML = KNOWN_GAMES.map(g => `
+    <div class="game-card${state.prototype === g.snake ? ' selected' : ''}" id="gc_${g.snake}" onclick="selectGame('${g.snake}')">
+      <div class="gc-icon">${g.icon}</div>
+      <div class="gc-name">${g.label}</div>
+      <div class="gc-snake">${g.snake}</div>
+    </div>`).join('');
+}
+function selectGame(snake) {
+  state.prototype = snake;
+  document.getElementById('customPrototype').value = '';
+  renderGameGrid();
+}
+function onCustomPrototype() {
+  const val = document.getElementById('customPrototype').value.trim();
+  state.prototype = val || '';
+  if (val) KNOWN_GAMES.forEach(g => { const el = document.getElementById('gc_'+g.snake); if(el) el.classList.remove('selected'); });
+  else renderGameGrid();
+}
+
+// ─── STEP 2 ──────────────────────────────────────────────────────────────────
+function toPascal(snake) { return snake.split('_').map(w => w ? w[0].toUpperCase()+w.slice(1) : '').join(''); }
+function onNameChange() {
+  const val = document.getElementById('newGameSnake').value.trim();
+  state.newGameSnake = val;
+  const pascal = val ? toPascal(val) : '';
+  document.getElementById('dcPascal').textContent = pascal || '—';
+  document.getElementById('dcLib').textContent = pascal ? `Egt${pascal}FsmStatic` : '—';
+  document.getElementById('dcAstro').textContent = pascal ? `Astro${pascal}` : '—';
+  document.getElementById('derivedNames').style.display = val ? 'block' : 'none';
+  if (!state.newGameDisplay) {
+    const auto = val.split('_').map(w => w ? w[0].toUpperCase()+w.slice(1) : '').join(' ');
+    document.getElementById('newGameDisplay').value = auto;
+    state.newGameDisplay = auto;
+  }
+  const valid = /^[a-z][a-z0-9_]*$/.test(val);
+  document.getElementById('snakeErr').classList.toggle('visible', val.length > 0 && !valid);
+  document.getElementById('newGameSnake').classList.toggle('error', val.length > 0 && !valid);
+}
+function onDisplayChange() { state.newGameDisplay = document.getElementById('newGameDisplay').value; }
+
+// ─── STEP 3: MATH FILE ───────────────────────────────────────────────────────
+function parseMathJson(json, filename) {
+  // Try known paths: top-level or nested under roundMain
+  const sd = json?.symbolsData ?? json?.roundMain?.symbolsData;
+  if (!sd?.symbolNames || sd.symbolNames.length === 0) return null;
+  return {
+    symbolNames: sd.symbolNames,
+    wildId:      sd.wildId      ?? sd.wildIds?.[0]  ?? null,
+    scatterIds:  sd.scatterIds  ?? (sd.coinId != null ? [sd.coinId] : []),
+  };
+}
+
+function loadMathFile(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const statusEl = document.getElementById('mathFileStatus');
+  statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = 'Четене...';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const json = JSON.parse(e.target.result);
+      const parsed = parseMathJson(json, file.name);
+      if (!parsed) {
+        statusEl.style.color = 'var(--red)';
+        statusEl.textContent = '✗ Не намерих symbolsData.symbolNames. Очаквани пътища: symbolsData или roundMain.symbolsData';
+        return;
+      }
+      state.mathFile.symbolNames = parsed.symbolNames;
+      state.mathFile.wildId      = parsed.wildId;
+      state.mathFile.scatterIds  = parsed.scatterIds;
+      renderSymbols();
+      // Auto-fill path, variant ID and dest file from filename
+      const base = file.name.replace('.json','');
+      const pathEl = document.getElementById('mathFilePath');
+      if (!pathEl.value) {
+        pathEl.value = file.name;   // браузърът не дава пълния path — потребителят допълва директорията
+        state.mathFile.sourcePath = file.name;
+      }
+      if (!document.getElementById('mathVariantId').value) document.getElementById('mathVariantId').value = base;
+      if (!document.getElementById('mathDestFile').value) document.getElementById('mathDestFile').value = 'math/' + file.name;
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = `✓ ${parsed.symbolNames.length} символа заредени от ${file.name}`;
+      event.target.value = '';
+    } catch { statusEl.style.color='var(--red)'; statusEl.textContent='✗ Невалиден JSON.'; }
+  };
+  reader.readAsText(file);
+}
+
+function onMathPathChange() {
+  state.mathFile.sourcePath = document.getElementById('mathFilePath').value.trim();
+  // Auto-fill dest file and variant ID from path
+  const fname = state.mathFile.sourcePath.split(/[/\\]/).pop();
+  if (fname && fname.endsWith('.json')) {
+    if (!document.getElementById('mathVariantId').value) document.getElementById('mathVariantId').value = fname.replace('.json','');
+    if (!document.getElementById('mathDestFile').value) document.getElementById('mathDestFile').value = 'math/' + fname;
+  }
+}
+
+function renderSymbols() {
+  const { symbolNames, wildId, scatterIds } = state.mathFile;
+  if (!symbolNames.length) { document.getElementById('mathSymbolsBox').style.display='none'; return; }
+  document.getElementById('mathSymbolsBox').style.display = 'block';
+  document.getElementById('symbolList').innerHTML = symbolNames.map((n,i) => {
+    const isWild    = i === wildId;
+    const isScatter = scatterIds.includes(i);
+    const cls = isWild ? 'symbol-chip wild' : isScatter ? 'symbol-chip scatter' : 'symbol-chip';
+    const tag = isWild ? ' W' : isScatter ? ' S' : '';
+    return `<span class="${cls}">${esc(n)}${tag}</span>`;
+  }).join('');
+}
+
+// ─── STEP 4: SETTINGS ────────────────────────────────────────────────────────
+function renderIntegrations() {
+  document.getElementById('integrationsGrid').innerHTML = ALL_INTEGRATIONS.map(i => `
+    <label class="integration-chip${state.integrations.includes(i.id) ? ' checked' : ''}" id="ic_${i.id}" onclick="toggleIntegration('${i.id}')">
+      <input type="checkbox" ${state.integrations.includes(i.id) ? 'checked' : ''}>
+      <span class="ic-dot"></span><span class="ic-label">${i.label}</span>
+    </label>`).join('');
+}
+function toggleIntegration(id) {
+  const idx = state.integrations.indexOf(id);
+  if (idx >= 0) state.integrations.splice(idx,1); else state.integrations.push(id);
+  renderIntegrations();
+}
+
+// ─── STEP 5: ASSETS ──────────────────────────────────────────────────────────
+function setAssetsMode(mode) {
+  state.assetsMode = mode;
+  document.getElementById('ao_reuse').classList.toggle('selected', mode==='reuse');
+  document.getElementById('ao_new').classList.toggle('selected', mode==='new');
+  document.getElementById('newAssetsSection').style.display = mode==='new' ? 'block' : 'none';
+  if (mode==='new') renderSymbolResources();
+}
+
+function onPrefixChange() {
+  state.gamePrefix = document.getElementById('gamePrefix').value.trim().toLowerCase();
+  renderSymbolResources();
+}
+
+function renderSymbolResources() {
+  const names   = state.mathFile.symbolNames;
+  const prefix  = state.gamePrefix || '';
+  const box     = document.getElementById('symbolResourcesBox');
+  const tbody   = document.getElementById('symbolResourcesBody');
+  if (!names.length) { box.style.display='none'; return; }
+  box.style.display = 'block';
+
+  const { wildId, scatterIds } = state.mathFile;
+  tbody.innerHTML = names.map((name, i) => {
+    const n       = name.toLowerCase();
+    const pre     = prefix || '{prefix}';
+    const sprite  = `p/reels/reelline/${pre}_REELLINE/${pre}_r_reelline_224px/${pre}_r_${n}.dds`;
+    const anim    = `p/reels/${n}/${n}_normal/`;
+    const sound   = `s/bg_${n}.wav`;
+    const isWild  = i === wildId;
+    const isScat  = scatterIds.includes(i);
+    const badge   = isWild
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--amber-bg);color:var(--amber);font-weight:700;">W</span>`
+      : isScat
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--purple-bg);color:var(--purple);font-weight:700;">S</span>`
+      : '';
+    const sidx = i; // stable index for oninput
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:700;">${esc(name)}</td>
+      <td>${badge}</td>
+      <td><input type="text" value="${esc(sprite)}" style="font-size:11px;" oninput="updateSymRes(${sidx},'sprite',this.value)" /></td>
+      <td><input type="text" value="${esc(anim)}"   style="font-size:11px;" oninput="updateSymRes(${sidx},'anim',this.value)"   /></td>
+      <td><input type="text" value="${esc(sound)}"  style="font-size:11px;" oninput="updateSymRes(${sidx},'sound',this.value)"  /></td>
+    </tr>`;
+  }).join('');
+
+  // Sync to state
+  state.symbolResources = names.map((name, i) => {
+    const n=name.toLowerCase(), pre=prefix||'';
+    return {
+      symbolId: i, name,
+      sprite: pre ? `p/reels/reelline/${pre}_REELLINE/${pre}_r_reelline_224px/${pre}_r_${n}.dds` : '',
+      anim:   `p/reels/${n}/${n}_normal/`,
+      sound:  `s/bg_${n}.wav`
+    };
+  });
+}
+
+function updateSymRes(idx, field, val) {
+  if (!state.symbolResources) return;
+  if (state.symbolResources[idx]) state.symbolResources[idx][field] = val;
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function syncState() {
+  state.gamesRoot      = document.getElementById('gamesRoot').value.trim() || state.gamesRoot;
+  state.resourcesDir   = document.getElementById('resourcesDir').value.trim();
+  state.newGameSnake   = document.getElementById('newGameSnake').value.trim();
+  state.newGameDisplay = document.getElementById('newGameDisplay').value.trim();
+  state.mathFile.sourcePath = document.getElementById('mathFilePath').value.trim();
+  state.mathFile.variantId  = document.getElementById('mathVariantId').value.trim();
+  state.mathFile.rtp        = parseFloat(document.getElementById('mathRtp').value) || '';
+  state.mathFile.destFile   = document.getElementById('mathDestFile').value.trim();
+  state.gamePrefix          = document.getElementById('gamePrefix').value.trim().toLowerCase();
+  state.prototypePrefixHint = document.getElementById('prototypePrefixHint').value.trim().toLowerCase();
+  state.resourcesDir        = document.getElementById('resourcesDir').value.trim();
+}
+
+function goStep(n) {
+  if (n > state.maxReached && n !== state.currentStep + 1) return;
+  syncState();
+  document.getElementById('step'+state.currentStep).classList.remove('active');
+  document.getElementById('ws'+state.currentStep).classList.remove('active');
+  state.currentStep = n;
+  if (n > state.maxReached) state.maxReached = n;
+  document.getElementById('step'+n).classList.add('active');
+  document.getElementById('ws'+n).classList.add('active');
+  updateWizardUI();
+  // Re-sync inputs when navigating back
+  document.getElementById('gamesRoot').value = state.gamesRoot;
+  document.getElementById('resourcesDir').value = state.resourcesDir;
+  document.getElementById('mathFilePath').value = state.mathFile.sourcePath;
+  document.getElementById('mathVariantId').value = state.mathFile.variantId;
+  document.getElementById('mathRtp').value = state.mathFile.rtp;
+  document.getElementById('mathDestFile').value = state.mathFile.destFile;
+  if (n === 5) {
+    document.getElementById('gamePrefix').value = state.gamePrefix;
+    document.getElementById('prototypePrefixHint').value = state.prototypePrefixHint;
+    if (state.assetsMode === 'new') renderSymbolResources();
+  }
+  if (n === 6) renderExport();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateWizardUI() {
+  for (let i=1; i<=6; i++) {
+    const ws=document.getElementById('ws'+i), wn=document.getElementById('wn'+i);
+    ws.classList.remove('active','done');
+    if (i < state.currentStep) { ws.classList.add('done'); wn.textContent='✓'; }
+    else if (i === state.currentStep) { ws.classList.add('active'); wn.textContent=i; }
+    else wn.textContent=i;
+  }
+}
+
+function validateAndNext(step) {
+  if (step===1) {
+    if (!state.prototype && !document.getElementById('customPrototype').value.trim()) { alert('Моля избери или въведи прототип.'); return; }
+    state.prototype = state.prototype || document.getElementById('customPrototype').value.trim();
+    goStep(2);
+  } else if (step===2) {
+    const snake = document.getElementById('newGameSnake').value.trim();
+    if (!snake) { alert('Моля въведи ново название.'); return; }
+    if (!/^[a-z][a-z0-9_]*$/.test(snake)) { alert('Невалидно название — само a-z, 0-9 и _.'); return; }
+    state.newGameSnake = snake;
+    state.newGameDisplay = document.getElementById('newGameDisplay').value.trim() || toPascal(snake).replace(/([A-Z])/g,' $1').trim();
+    goStep(3);
+  } else if (step===3) {
+    const path = document.getElementById('mathFilePath').value.trim();
+    const vid  = document.getElementById('mathVariantId').value.trim();
+    const rtp  = document.getElementById('mathRtp').value;
+    if (!vid)  { alert('Моля въведи Variant ID.'); return; }
+    if (!rtp)  { alert('Моля въведи RTP стойност.'); return; }
+    // Path е нужен на workflow-а, но не блокира ако символите са заредени
+    if (!path && !state.mathFile.symbolNames.length) {
+      alert('Моля въведи пътя до math файла или го зареди с файловия picker.'); return;
+    }
+    if (!path) {
+      // Символите са заредени от picker, но пълният path липсва
+      const ok = confirm('Пълният path до math файла не е попълнен.\nWorkflow-ът ще го нужда за да копира файла.\n\nПродължи без него?');
+      if (!ok) return;
+    }
+    goStep(4);
+  } else if (step===4) {
+    if (!document.getElementById('gamesRoot').value.trim()) { alert('Моля въведи games source root.'); return; }
+    if (state.integrations.length===0) { alert('Моля избери поне един integration.'); return; }
+    syncState();
+    goStep(5);
+  } else if (step===5) {
+    goStep(6);
+  }
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function buildConfig() {
+  syncState();
+  const pascal = toPascal(state.newGameSnake);
+  return {
+    version: 1,
+    prototype: state.prototype,
+    newGame: {
+      snakeName:   state.newGameSnake,
+      pascalName:  pascal,
+      displayName: state.newGameDisplay || pascal
+    },
+    paths: { gamesRoot: state.gamesRoot },
+    integrations: state.integrations,
+    math: {
+      sourcePath:  state.mathFile.sourcePath,
+      variantId:   state.mathFile.variantId,
+      rtp:         state.mathFile.rtp,
+      destFile:    state.mathFile.destFile || 'math/' + state.mathFile.sourcePath.split(/[/\\]/).pop(),
+      symbolNames: state.mathFile.symbolNames.length ? state.mathFile.symbolNames : undefined,
+      wildId:      state.mathFile.wildId,
+      scatterIds:  state.mathFile.scatterIds.length ? state.mathFile.scatterIds : undefined
+    },
+    assets: {
+      mode:            state.assetsMode,
+      resourcesDir:    state.assetsMode==='new' && state.resourcesDir   ? state.resourcesDir   : null,
+      gamePrefix:           state.assetsMode==='new' && state.gamePrefix           ? state.gamePrefix           : null,
+      prototypePrefixHint:  state.assetsMode==='new' && state.prototypePrefixHint ? state.prototypePrefixHint  : null,
+      symbolResources:      state.assetsMode==='new' && state.symbolResources.length ? state.symbolResources   : null
+    }
+  };
+}
+
+function renderExport() {
+  const cfg = buildConfig();
+  const pascal = cfg.newGame.pascalName;
+  const intTags = state.integrations.map(i => `<span class="st-tag" style="background:var(--accent-light);color:var(--accent)">${i}</span>`).join(' ');
+  const symInfo = state.mathFile.symbolNames.length
+    ? `${state.mathFile.symbolNames.length} символа`
+    : '<span style="color:var(--text-muted)">—  (math файлът не е зареден в браузъра)</span>';
+  document.getElementById('summaryTable').innerHTML = `
+    <tr><td>Прототип</td><td class="st-mono">${esc(state.prototype)}</td></tr>
+    <tr><td>Нова игра</td><td class="st-mono">${esc(state.newGameSnake)}</td></tr>
+    <tr><td>C++ клас</td><td class="st-mono">${esc(pascal)}Fsm / Math / View</td></tr>
+    <tr><td>Math файл</td><td class="st-mono">${esc(cfg.math.sourcePath)}</td></tr>
+    <tr><td>Символи</td><td>${symInfo}</td></tr>
+    <tr><td>RTP</td><td class="st-mono">${cfg.math.rtp || '—'} (${cfg.math.variantId || '—'})</td></tr>
+    <tr><td>Games root</td><td class="st-mono">${esc(state.gamesRoot)}</td></tr>
+    <tr><td>Integrations</td><td>${intTags}</td></tr>
+    <tr><td>Assets</td><td>${state.assetsMode==='reuse' ? 'Reuse prototype (pure copy)' : '🎨 Нови assets: ' + esc(state.resourcesDir||'(без overlay)')}</td></tr>
+    <tr><td>Game prefix</td><td class="st-mono">${state.assetsMode==='new' && state.gamePrefix ? esc(state.gamePrefix) : '<span style="color:var(--text-muted)">—</span>'}</td></tr>
+  `;
+  document.getElementById('jsonPreview').innerHTML = syntaxHighlight(JSON.stringify(cfg, null, 2));
+}
+
+function syntaxHighlight(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let cls='json-num';
+      if (/^"/.test(m)) cls = /:$/.test(m) ? 'json-key' : 'json-str';
+      else if (/true|false/.test(m)) cls='json-bool';
+      else if (/null/.test(m)) cls='json-null';
+      return `<span class="${cls}">${m}</span>`;
+    });
+}
+
+function downloadConfig() {
+  const json = JSON.stringify(buildConfig(), null, 2);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], {type:'application/json'}));
+  a.download = `game-creator-${state.newGameSnake||'config'}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function copyConfig() {
+  navigator.clipboard.writeText(JSON.stringify(buildConfig(), null, 2)).then(() => {
+    const btn = document.querySelector('[onclick="copyConfig()"]');
+    const orig = btn.textContent; btn.textContent='✓ Копирано';
+    setTimeout(()=>btn.textContent=orig, 1500);
+  });
+}
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+function resetWizard() {
+  if (!confirm('Изчисти всички данни и започни отначало?')) return;
+  Object.assign(state, {
+    currentStep:1, maxReached:1, prototype:'', newGameSnake:'', newGameDisplay:'',
+    mathFile:{ sourcePath:'', variantId:'', rtp:'', destFile:'', symbolNames:[], wildId:null, scatterIds:[] },
+    gamesRoot:'C:/mklinks/games', integrations:['astro','playground','inspired'],
+    assetsMode:'reuse', resourcesDir:'', gamePrefix:'', prototypePrefixHint:'', symbolResources:[], rssMapping:[]
+  });
+  ['customPrototype','newGameSnake','newGameDisplay','mathFilePath','mathVariantId','mathRtp','mathDestFile','resourcesDir','gamePrefix','prototypePrefixHint']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('gamesRoot').value = state.gamesRoot;
+  document.getElementById('mathSymbolsBox').style.display='none';
+  document.getElementById('mathFileStatus').textContent='';
+  document.getElementById('newAssetsSection').style.display='none';
+  document.getElementById('symbolResourcesBody').innerHTML='';
+  document.getElementById('symbolResourcesBox').style.display='none';
+  document.querySelectorAll('.step-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('step1').classList.add('active');
+  setAssetsMode('reuse');
+  renderGameGrid(); renderIntegrations(); updateWizardUI();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

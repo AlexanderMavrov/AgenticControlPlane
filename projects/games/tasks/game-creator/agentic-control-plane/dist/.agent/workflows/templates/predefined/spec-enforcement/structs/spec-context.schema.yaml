@@ -1,0 +1,38 @@
+name: spec-context
+description: >
+  Context gathered from behavioral specs before implementation.
+  Contains the mode (targeted/auto-discovery), primary spec requirements
+  (if targeted), and related specs to preserve.
+  In auto-discovery mode, primary_spec is null — all specs are related/protective.
+format: json
+
+json_schema:
+  required_fields:
+    - field: mode
+      type: string
+      enum: [targeted, auto-discovery]
+    - field: component
+      type: string
+    - field: related_specs
+      type: array
+    - field: related_specs[].spec_id
+      type: string
+    - field: related_specs[].path
+      type: string
+    - field: related_specs[].relationship
+      type: string
+    - field: affected_files
+      type: array
+
+  # primary_spec fields are NOT required — they are null in auto-discovery mode.
+  # In targeted mode, the subagent should populate primary_spec as an object
+  # with spec_id, path, and requirements fields, but the structural gate
+  # does not enforce these sub-fields to support both modes.
+  #
+  # component: In targeted mode this is the component name (e.g., "EditField").
+  # In auto-discovery mode, use a descriptive value (e.g., "multiple" or
+  # "auto-discovery") since there is no single target component.
+
+file_checks:
+  exists: true
+  min_size: 50

@@ -1,0 +1,223 @@
+name: spec-enforcement
+version: 2
+description: >
+  Implement a code change while respecting all behavioral specs.
+  Checks existing specs before implementation, verifies no violations after,
+  and registers affected files in _registry.json.
+  Used standalone via /run-workflow, /code-with-spec, or via delegate_to
+  from spec-write-and-implement.
+
+  Two modes:
+  - WITH component: targets a specific component's spec (original behavior)
+  - WITHOUT component: analyzes the instruction to auto-discover affected
+    specs via _registry.json (broad mode)
+
+params:
+  - name: component
+    description: >
+      Component name to implement changes for (e.g., EditField).
+      If not provided, the workflow auto-discovers affected specs by
+      analyzing the instruction text and checking _registry.json for
+      files that may be impacted.
+    required: false
+
+  - name: domain
+    description: "Logical domain (e.g., ui, messaging). Used to find the spec file."
+    required: false
+
+  - name: instruction
+    description: >
+      What code change to make. Required when component is not provided.
+      If called from spec-write-and-implement, this is derived from the
+      spec requirements. If called from /code-with-spec, this is the
+      user's instruction.
+    required: false
+
+  - name: spec_path
+    description: >
+      Explicit path to the spec file. If not provided, searches
+      .agent/specs/**/{component}.md.
+    required: false
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+
+steps:
+  # ──────────────────────────────────────────────
+  # Step 1: CHECK-SPECS
+  # Read all relevant specs before making changes.
+  # ──────────────────────────────────────────────
+  - name: check-specs
+    spec_check: false
+    goal: >
+      Gather all behavioral specs relevant to the code change.
+
+      **MODE A — component provided:**
+      1. Find the primary spec:
+         - If "spec_path" param is set: read that file
+         - Otherwise: search .agent/specs/**/{component}.md
+      2. Read _registry.json to find which files implement this component
+      3. For each implementing file: find OTHER specs that also map to it
+         (these are specs we must not violate)
+      4. Read all relevant specs and produce a checklist:
+         - Primary spec: requirements to implement
+         - Related specs: requirements to preserve (do not violate)
+
+      **MODE B — component NOT provided (auto-discovery):**
+      1. Read the "instruction" param to understand what code change is requested
+      2. Analyze the instruction to identify which files/modules will likely
+         be affected (search the codebase for relevant files)
+      3. Read _registry.json and check EVERY mapping:
+         - For each spec in mappings, check its "implemented_by" files
+         - If ANY of the likely-affected files appear in a spec's implemented_by
+           list, that spec is relevant
+      4. Also search .agent/specs/_index.json for specs whose component name
+         or domain matches keywords in the instruction
+      5. Collect ALL matched specs as "related specs to preserve"
+      6. There is no "primary spec" in this mode — all are related/protective
+
+      In both modes, output a JSON file with the full spec context.
+      The spec-context must include:
+        - mode: "targeted" or "auto-discovery"
+        - primary_spec: spec ID (or null in auto-discovery mode)
+        - related_specs: array of { spec_id, path, relationship }
+        - affected_files: array of files likely to be modified
+    subagent: true
+    inputs:
+      - path: ".agent/specs/**/{component}.md"
+        inject: file_if_exists
+      - path: ".agent/specs/_registry.json"
+        inject: file_if_exists
+      - path: ".agent/specs/_index.json"
+        inject: file_if_exists
+    outputs:
+      - path: data/spec-context.json
+        struct: spec-context
+
+  # ──────────────────────────────────────────────
+  # Step 2: IMPLEMENT
+  # Make the code change, respecting all specs.
+  # ──────────────────────────────────────────────
+  - name: implement
+    spec_check: false   # spec logic is already explicit in this step's goal
+    goal: >
+      Implement the code change, respecting ALL specs from the spec context.
+
+      1. Read the spec context (mode, primary spec, related specs, affected files)
+      2. Determine what to implement:
+         - If "instruction" param is set: follow it as the primary task
+         - If not (and mode is "targeted"): implement ALL requirements from
+           the primary spec
+         - If mode is "auto-discovery": "instruction" is always set — follow it
+      3. Find existing code for the affected component/files (search codebase)
+      4. Make code changes to satisfy the requirements
+      5. As you work, continuously check that your changes do NOT violate
+         any related spec from the checklist
+      6. If a conflict is found between specs:
+         - STOP implementation immediately
+         - Report the conflict clearly in your summary
+         - Do NOT proceed with conflicting changes
+
+      Be precise. Follow specs exactly. Do not add unrequested behavior.
+    subagent: true
+    inputs:
+      - path: data/spec-context.json
+        struct: spec-context
+      - path: ".agent/specs/**/*.md"
+        inject: file_if_exists
+    outputs:
+      - path: data/implementation-report.json
+        struct: implementation-report
+
+  # ──────────────────────────────────────────────
+  # Step 3: VERIFY
+  # Post-implementation verification against all specs.
+  # ──────────────────────────────────────────────
+  - name: verify
+    spec_check: false   # this IS the verification step — already checks specs explicitly
+    goal: >
+      Verify that the implementation does not violate any behavioral spec.
+
+      1. Read the implementation report (which files were modified)
+      2. For EACH modified file:
+         a. Check _registry.json for all specs that reference this file
+            (check both "file" field in implemented_by entries)
+         b. Read each spec
+         c. Consider the file's relationship type (direct, imports, style, etc.):
+            - "direct": verify ALL spec requirements
+            - "imports": verify requirements related to the logic this module provides
+            - "style": verify visual/UI requirements
+            - "config": verify values match spec constraints
+            - "test": verify test still covers spec requirements
+         d. Verify the modified file still satisfies the relevant requirements
+      3. Also check the primary spec: are all requirements now satisfied?
+      4. Produce a verification report:
+         - specs_checked: list of spec IDs checked
+         - all_satisfied: boolean
+         - violations: list of any violations found — each with:
+           spec_id, requirement, issue, file (source file path),
+           line_number (approximate line where violation occurs)
+
+      If violations are found, report them clearly.
+    subagent: true
+    inputs:
+      - path: data/implementation-report.json
+        struct: implementation-report
+      - path: ".agent/specs/**/*.md"
+        inject: file_if_exists
+      - path: ".agent/specs/_registry.json"
+        inject: file_if_exists
+    outputs:
+      - path: data/verification-report.json
+        struct: verification-report
+
+  # ──────────────────────────────────────────────
+  # Step 4: REGISTER
+  # Update _registry.json with implementation mapping.
+  # ──────────────────────────────────────────────
+  - name: register
+    spec_check: false
+    goal: >
+      Update the implementation registry with the files that were modified.
+
+      1. Read the implementation report (files modified)
+      2. Read the verification report (confirm no violations)
+      3. Read .agent/specs/_registry.json (or create if missing)
+      4. Update the registry:
+         - If "component" param is set (targeted mode):
+           Add/update the mapping for "{component}" with the modified files
+         - If "component" is NOT set (auto-discovery mode):
+           For EACH spec that was checked in the verification report,
+           add the newly modified files to that spec's implemented_by array
+           (only if the file is relevant to that spec)
+         - For each file entry use: { "file": "<path>", "relationship": "<type>" }
+           Relationship types: "direct" (primary implementation), "imports" (imported
+           module with spec logic), "imported_by" (consumer), "style" (CSS/SCSS),
+           "config" (constants/i18n), "test" (test files)
+           Determine the relationship from the implementation report.
+           Default to "direct" if unclear.
+         - last_verified: current date
+         - verified_by: "spec-enforcement" workflow
+      5. Write updated _registry.json
+
+      6. Print a SUMMARY to the chat:
+         - Mode: targeted / auto-discovery
+         - Component(s): {component} or list of affected specs
+         - Files modified: list
+         - Specs checked: N
+         - Violations: none / list
+    subagent: true
+    inputs:
+      - path: data/implementation-report.json
+      - path: data/verification-report.json
+      - path: ".agent/specs/_registry.json"
+        inject: file_if_exists
+    outputs:
+      - path: ".agent/specs/_registry.json"

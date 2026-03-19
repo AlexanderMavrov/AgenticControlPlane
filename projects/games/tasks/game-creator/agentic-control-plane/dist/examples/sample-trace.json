@@ -1,0 +1,253 @@
+{
+  "trace_version": 1,
+  "workflow": "spec-enforcement",
+  "workflow_version": 2,
+  "run_id": "spec-enforcement-20260314-103025",
+  "description": "Implement a code change while respecting all behavioral specs. Checks existing specs before implementation, verifies no violations after, and registers affected files in _registry.json. Used standalone via /run-workflow, /code-with-spec, or via delegate_to from spec-write-and-implement.\n\nTwo modes:\n- WITH component: targets a specific component's spec (original behavior)\n- WITHOUT component: analyzes the instruction to auto-discover affected specs via _registry.json (broad mode)",
+  "context": {
+    "carry_forward": "summary"
+  },
+  "params": {
+    "component": "EditField",
+    "domain": "ui",
+    "instruction": "add max length validation with character counter",
+    "spec_path": null
+  },
+  "param_defs": [
+    {
+      "name": "component",
+      "description": "Component name to implement changes for (e.g., EditField). If not provided, the workflow auto-discovers affected specs by analyzing the instruction text and checking _registry.json.",
+      "required": false
+    },
+    {
+      "name": "domain",
+      "description": "Logical domain (e.g., ui, messaging). Used to find the spec file.",
+      "required": false
+    },
+    {
+      "name": "instruction",
+      "description": "What code change to make. Required when component is not provided. If called from spec-write-and-implement, this is derived from the spec requirements.",
+      "required": false
+    },
+    {
+      "name": "spec_path",
+      "description": "Explicit path to the spec file. If not provided, searches .agent/specs/**/{component}.md.",
+      "required": false
+    }
+  ],
+  "gate_config": {
+    "structural": true,
+    "semantic": true,
+    "human": false,
+    "max_gate_retries": 5,
+    "max_step_retries": 3
+  },
+  "started_at": "2026-03-14T10:30:25+02:00",
+  "completed_at": "2026-03-14T10:52:47+02:00",
+  "status": "completed",
+  "total_duration_ms": 1342000,
+  "total_messages": 47,
+  "total_tool_calls": 93,
+  "total_modified_files": 6,
+  "steps": [
+    {
+      "name": "check-specs",
+      "index": 0,
+      "status": "completed",
+      "config": {
+        "spec_check": false,
+        "subagent": true,
+        "gate": null
+      },
+      "goal": "Find the primary spec for {component} in .agent/specs/{domain}/. Read _registry.json to identify all files that implement this spec (direct, imports, style, config, test). Read the spec file and extract all requirements. Identify related specs that may be affected. Write a spec-context.json with: spec path, requirements list, affected files, related specs.",
+      "inputs": [
+        { "path": ".agent/specs/_registry.json", "inject": "reference" },
+        { "path": ".agent/specs/{domain}/{component}.md", "inject": "file_if_exists" }
+      ],
+      "outputs": [
+        { "path": "data/spec-context.json", "struct": "spec-context" }
+      ],
+      "started_at": "2026-03-14T10:30:25+02:00",
+      "completed_at": "2026-03-14T10:33:10+02:00",
+      "duration_ms": 165000,
+      "invocations": [
+        {
+          "iteration": 1,
+          "retry_type": null,
+          "completed_at": "2026-03-14T10:33:10+02:00",
+          "duration_ms": 165000,
+          "hook_status": "completed",
+          "message_count": 8,
+          "tool_call_count": 15,
+          "modified_files": [
+            ".agent/workflows/spec-enforcement/data/spec-context.json"
+          ],
+          "gate": {
+            "type": "structural",
+            "passed": true,
+            "checks": 1,
+            "failures": 0,
+            "details": []
+          }
+        }
+      ],
+      "retry_count": 0,
+      "summary": "Found primary spec ui/EditField.md with 8 requirements. Related specs: ui/FormLayout.md (imports relationship). Affected files: src/components/EditField.tsx, src/validation/fieldRules.ts."
+    },
+    {
+      "name": "implement",
+      "index": 1,
+      "status": "completed",
+      "config": {
+        "spec_check": false,
+        "subagent": true,
+        "gate": null
+      },
+      "goal": "Implement the requested change: {instruction}. Modify the component {component} and any related files. Follow all requirements from the spec. Write an implementation-report.json documenting what was changed and why.",
+      "inputs": [
+        { "path": "data/spec-context.json", "inject": "file" }
+      ],
+      "outputs": [
+        { "path": "data/implementation-report.json", "struct": "implementation-report" }
+      ],
+      "started_at": "2026-03-14T10:33:15+02:00",
+      "completed_at": "2026-03-14T10:44:30+02:00",
+      "duration_ms": 675000,
+      "invocations": [
+        {
+          "iteration": 1,
+          "retry_type": null,
+          "completed_at": "2026-03-14T10:40:20+02:00",
+          "duration_ms": 425000,
+          "hook_status": "completed",
+          "message_count": 12,
+          "tool_call_count": 28,
+          "modified_files": [
+            "src/components/EditField.tsx",
+            "src/validation/fieldRules.ts",
+            "src/styles/EditField.module.css"
+          ],
+          "gate": {
+            "type": "structural",
+            "passed": false,
+            "checks": 1,
+            "failures": 1,
+            "details": [
+              "No output files matching: .agent/workflows/spec-enforcement/data/implementation-report.json"
+            ]
+          }
+        },
+        {
+          "iteration": 2,
+          "retry_type": "gate",
+          "completed_at": "2026-03-14T10:44:30+02:00",
+          "duration_ms": 250000,
+          "hook_status": "completed",
+          "message_count": 6,
+          "tool_call_count": 10,
+          "modified_files": [
+            "src/components/EditField.tsx",
+            ".agent/workflows/spec-enforcement/data/implementation-report.json"
+          ],
+          "gate": {
+            "type": "structural",
+            "passed": true,
+            "checks": 1,
+            "failures": 0,
+            "details": []
+          }
+        }
+      ],
+      "retry_count": 1,
+      "summary": "Added maxLength prop with character counter display. Updated validation rules in fieldRules.ts. Added CSS styles for counter and error states. Gate retry: forgot to write implementation-report.json on first attempt."
+    },
+    {
+      "name": "verify",
+      "index": 2,
+      "status": "completed",
+      "config": {
+        "spec_check": false,
+        "subagent": true,
+        "gate": null
+      },
+      "goal": "Verify that all modified files comply with their specs. Read the implementation report, then check each modified file against the relevant spec requirements. Write a verification-report.json with pass/fail per requirement.",
+      "inputs": [
+        { "path": "data/spec-context.json", "inject": "file" },
+        { "path": "data/implementation-report.json", "inject": "file" }
+      ],
+      "outputs": [
+        { "path": "data/verification-report.json", "struct": "verification-report" }
+      ],
+      "started_at": "2026-03-14T10:44:35+02:00",
+      "completed_at": "2026-03-14T10:49:20+02:00",
+      "duration_ms": 285000,
+      "invocations": [
+        {
+          "iteration": 1,
+          "retry_type": null,
+          "completed_at": "2026-03-14T10:49:20+02:00",
+          "duration_ms": 285000,
+          "hook_status": "completed",
+          "message_count": 10,
+          "tool_call_count": 22,
+          "modified_files": [
+            ".agent/workflows/spec-enforcement/data/verification-report.json"
+          ],
+          "gate": {
+            "type": "structural",
+            "passed": true,
+            "checks": 1,
+            "failures": 0,
+            "details": []
+          }
+        }
+      ],
+      "retry_count": 0,
+      "summary": "Verified 3 modified files against 2 specs (EditField, FormLayout). All 8 primary requirements satisfied. No violations found in related specs."
+    },
+    {
+      "name": "register",
+      "index": 3,
+      "status": "completed",
+      "config": {
+        "spec_check": false,
+        "subagent": true,
+        "gate": null
+      },
+      "goal": "Update _registry.json to reflect the current implementation mapping. Add any new files that now implement the spec. Update last_verified date.",
+      "inputs": [
+        { "path": "data/implementation-report.json", "inject": "file" },
+        { "path": ".agent/specs/_registry.json", "inject": "reference" }
+      ],
+      "outputs": [
+        { "path": ".agent/specs/_registry.json" }
+      ],
+      "started_at": "2026-03-14T10:49:25+02:00",
+      "completed_at": "2026-03-14T10:52:47+02:00",
+      "duration_ms": 202000,
+      "invocations": [
+        {
+          "iteration": 1,
+          "retry_type": null,
+          "completed_at": "2026-03-14T10:52:47+02:00",
+          "duration_ms": 202000,
+          "hook_status": "completed",
+          "message_count": 11,
+          "tool_call_count": 18,
+          "modified_files": [
+            ".agent/specs/_registry.json"
+          ],
+          "gate": {
+            "type": "structural",
+            "passed": true,
+            "checks": 1,
+            "failures": 0,
+            "details": []
+          }
+        }
+      ],
+      "retry_count": 0,
+      "summary": "Updated _registry.json: EditField mapping now includes 3 files (direct: EditField.tsx, imports: fieldRules.ts, style: EditField.module.css). Last verified: 2026-03-14."
+    }
+  ]
+}

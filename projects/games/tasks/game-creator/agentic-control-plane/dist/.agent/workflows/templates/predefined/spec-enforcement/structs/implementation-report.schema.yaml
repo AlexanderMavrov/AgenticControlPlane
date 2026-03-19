@@ -1,0 +1,34 @@
+name: implementation-report
+description: >
+  Output of the IMPLEMENT step — list of files modified
+  and spec compliance check results.
+format: json
+
+json_schema:
+  # component: In targeted mode this is the component name (e.g., "EditField").
+  # In auto-discovery mode, use a descriptive value (e.g., "multiple" or
+  # "auto-discovery") since there is no single target component.
+  # spec_path: In auto-discovery mode, use "auto-discovery" or the primary spec path.
+  required_fields:
+    - field: component
+      type: string
+    - field: spec_path
+      type: string
+    - field: skipped
+      type: boolean
+    - field: files_modified
+      type: array
+    - field: files_modified[].path
+      type: string
+    - field: files_modified[].action
+      type: string
+      enum: [created, modified, deleted]
+    - field: specs_checked
+      type: array
+    - field: specs_checked[].spec_id
+      type: string
+    - field: specs_checked[].status
+      type: string
+      enum: [compliant, violation, not_applicable]
+    - field: violations
+      type: array

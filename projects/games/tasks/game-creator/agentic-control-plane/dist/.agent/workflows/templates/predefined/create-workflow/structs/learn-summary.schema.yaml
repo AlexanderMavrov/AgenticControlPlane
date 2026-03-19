@@ -1,0 +1,15 @@
+name: learn-summary
+description: Confirmation that the LLM has read and understood the workflow engine documentation.
+format: json
+
+json_schema:
+  required_fields:
+    - field: status
+      type: string
+      enum: [ready]
+    - field: docs_read
+      type: array
+      min_items: 4
+    - field: capabilities_understood
+      type: array
+      min_items: 3

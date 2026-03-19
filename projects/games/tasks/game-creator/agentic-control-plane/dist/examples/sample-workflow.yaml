@@ -1,0 +1,160 @@
+# Sample workflow definition that corresponds to sample-trace.json
+# This file is for reference only — it shows the workflow.yaml that
+# produced the trace in sample-trace.json.
+
+name: spec-enforcement
+version: 2
+description: >
+  Implement a code change while respecting all behavioral specs.
+  Checks existing specs before implementation, verifies no violations after,
+  and registers affected files in _registry.json.
+  Used standalone via /run-workflow, /code-with-spec, or via delegate_to
+  from spec-write-and-implement.
+
+  Two modes:
+  - WITH component: targets a specific component's spec (original behavior)
+  - WITHOUT component: analyzes the instruction to auto-discover affected
+    specs via _registry.json (broad mode)
+
+params:
+  - name: component
+    description: >
+      Component name to implement changes for (e.g., EditField).
+      If not provided, the workflow auto-discovers affected specs by
+      analyzing the instruction text and checking _registry.json for
+      files that may be impacted.
+    required: false
+  - name: domain
+    description: "Logical domain (e.g., ui, messaging). Used to find the spec file."
+    required: false
+  - name: instruction
+    description: >
+      What code change to make. Required when component is not provided.
+      If called from spec-write-and-implement, this is derived from the
+      spec requirements. If called from /code-with-spec, this is the
+      user's instruction.
+    required: false
+  - name: spec_path
+    description: >
+      Explicit path to the spec file. If not provided, searches
+      .agent/specs/**/{component}.md.
+    required: false
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+  # ↑ After each step completes, the orchestrator saves a short summary
+  #   to context/<step-name>.summary.md. When launching the NEXT step's
+  #   subagent, ALL previous summaries are injected into the prompt.
+  #
+  #   This is NOT visible in step.inputs — it's an orchestrator behavior.
+  #   The flow looks like this:
+  #
+  #   Step 1 (check-specs) completes
+  #     → orchestrator writes context/check-specs.summary.md
+  #
+  #   Step 2 (implement) starts
+  #     → orchestrator reads context/check-specs.summary.md
+  #     → injects it into the subagent prompt as:
+  #       "Previous step 'check-specs' summary: Found primary spec
+  #        ui/EditField.md with 8 requirements..."
+  #
+  #   Step 3 (verify) starts
+  #     → orchestrator reads context/check-specs.summary.md
+  #       AND context/implement.summary.md
+  #     → injects BOTH into the subagent prompt
+  #
+  #   This gives each step awareness of what happened before,
+  #   without carrying the full context (which would overflow).
+
+steps:
+  # ──────────────────────────────────────────────────────
+  # STEP 1: CHECK-SPECS
+  # Find and read the relevant spec(s) for the component.
+  # Produces a spec-context.json with requirements list.
+  # ──────────────────────────────────────────────────────
+  - name: check-specs
+    spec_check: false       # ← This step reads specs, it doesn't write code
+    goal: >
+      Find the primary spec for {component} in .agent/specs/{domain}/.
+      Read _registry.json to identify all files that implement this spec
+      (direct, imports, style, config, test). Read the spec file and extract
+      all requirements. Identify related specs that may be affected.
+      Write a spec-context.json with: spec path, requirements list,
+      affected files, related specs.
+    inputs:
+      - path: .agent/specs/_registry.json
+        inject: reference    # ← subagent reads this file itself
+      - path: .agent/specs/{domain}/{component}.md
+        inject: file_if_exists  # ← included in prompt if exists
+    outputs:
+      - path: data/spec-context.json
+        struct: spec-context  # ← validated against structs/spec-context.schema.yaml
+
+  # ──────────────────────────────────────────────────────
+  # STEP 2: IMPLEMENT
+  # Make the actual code change. This is where files are modified.
+  # ──────────────────────────────────────────────────────
+  - name: implement
+    spec_check: false       # ← spec logic is already explicit in this step's goal
+    goal: >
+      Implement the requested change: {instruction}.
+      Modify the component {component} and any related files.
+      Follow all requirements from the spec.
+      Write an implementation-report.json documenting what was changed and why.
+    inputs:
+      - path: data/spec-context.json
+        inject: file         # ← full content included in prompt
+      # NOTE: carry_forward summaries are also injected here by the
+      # orchestrator — step 1's summary provides context about which
+      # specs were found and what requirements to follow.
+    outputs:
+      - path: data/implementation-report.json
+        struct: implementation-report
+
+  # ──────────────────────────────────────────────────────
+  # STEP 3: VERIFY
+  # Check all modified files against their specs.
+  # ──────────────────────────────────────────────────────
+  - name: verify
+    spec_check: false       # ← This step IS the verification — no need for double-check
+    goal: >
+      Verify that all modified files comply with their specs.
+      Read the implementation report, then check each modified file
+      against the relevant spec requirements.
+      Write a verification-report.json with pass/fail per requirement.
+    inputs:
+      - path: data/spec-context.json
+        inject: file
+      - path: data/implementation-report.json
+        inject: file
+      # NOTE: carry_forward summaries from steps 1+2 are also injected
+    outputs:
+      - path: data/verification-report.json
+        struct: verification-report
+
+  # ──────────────────────────────────────────────────────
+  # STEP 4: REGISTER
+  # Update _registry.json with the new implementation mapping.
+  # ──────────────────────────────────────────────────────
+  - name: register
+    spec_check: false       # ← Modifies registry metadata, not code
+    goal: >
+      Update _registry.json to reflect the current implementation mapping.
+      Add any new files that now implement the spec.
+      Update last_verified date.
+    inputs:
+      - path: data/implementation-report.json
+        inject: file
+      - path: .agent/specs/_registry.json
+        inject: reference
+      # NOTE: carry_forward summaries from steps 1+2+3 are also injected
+    outputs:
+      - path: .agent/specs/_registry.json
+        # No struct — _registry.json has its own canonical format
