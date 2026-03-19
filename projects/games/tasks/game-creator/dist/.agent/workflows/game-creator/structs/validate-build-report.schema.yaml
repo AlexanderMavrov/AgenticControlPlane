@@ -1,0 +1,131 @@
+name: validate-build-report
+version: 1
+description: >
+  Report from Step 8 (validate-and-build).
+  Covers filesystem validation, CMake configure, and build results.
+type: object
+
+required:
+  - filesystem_validation
+  - cmake_configure
+  - cmake_build
+  - status
+
+properties:
+  filesystem_validation:
+    type: object
+    description: "Results of scanning new directories for stale OLD name references"
+    required: [checks_run, stale_references_found, status]
+    properties:
+      checks_run:
+        type: integer
+        description: "Total number of files/dirs scanned"
+      stale_references_found:
+        type: array
+        description: "Files that still contain OLD game name references"
+        items:
+          type: object
+          required: [file, pattern, occurrences]
+          properties:
+            file:
+              type: string
+              description: "Relative path to file with stale reference"
+            pattern:
+              type: string
+              description: "The OLD name pattern found (e.g. oldPascal, prototype, oldLower, oldUpper)"
+            occurrences:
+              type: integer
+              description: "Number of occurrences in this file"
+      directories_verified:
+        type: array
+        description: "List of directories confirmed to exist"
+        items:
+          type: string
+      status:
+        type: string
+        enum: [pass, warnings, fail]
+  cmake_configure:
+    type: object
+    description: "Results of CMake configure step"
+    required: [preset_used, status]
+    properties:
+      preset_used:
+        type: string
+        description: "CMake preset name used (e.g. msvc-dbg)"
+      command:
+        type: string
+        description: "Full cmake command executed"
+      autodetect_entries:
+        type: array
+        description: "Autodetect log lines found in CMake output for the new game"
+        items:
+          type: string
+      missing_autodetect:
+        type: array
+        description: "Expected autodetect entries that were NOT found"
+        items:
+          type: string
+      cmake_errors:
+        type: array
+        description: "CMake error messages, if any"
+        items:
+          type: string
+      status:
+        type: string
+        enum: [success, failed, skipped]
+  cmake_build:
+    type: object
+    description: "Results of CMake build step"
+    required: [status]
+    properties:
+      command:
+        type: string
+        description: "Full cmake build command executed"
+      build_errors:
+        type: array
+        description: "Compilation/link errors, if any"
+        items:
+          type: string
+      build_warnings:
+        type: array
+        description: "Compilation warnings related to the new game"
+        items:
+          type: string
+      targets_built:
+        type: array
+        description: "List of new game targets that were built successfully"
+        items:
+          type: string
+      status:
+        type: string
+        enum: [success, failed, skipped]
+  decisions:
+    type: array
+    description: "Non-trivial decisions made during this step"
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question:
+          type: string
+          description: "The question or ambiguity that arose"
+        options_considered:
+          type: array
+          items:
+            type: string
+          description: "Potential solutions that were evaluated"
+        resolution:
+          type: string
+          description: "The chosen solution and reasoning"
+        resolved_by:
+          type: string
+          enum: [agent, user]
+          description: "Whether the agent decided autonomously or the user was consulted"
+  errors:
+    type: array
+    description: "Any errors encountered during validation"
+    items:
+      type: string
+  status:
+    type: string
+    enum: [success, partial, failed]

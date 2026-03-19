@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Workspace/games/integration/astro/apps -type f -name *burning*)",
+      "Bash(grep -E \"\\(\\\\.h|\\\\.cpp\\)$\")",
+      "Bash(grep -rn BurningHotCoins C:/Users/aleksandar.mavrov/MyWorkspace/WORK_TOPICS/projects/games/project_source_symlink/game/alpha_family/plugins/burning_hot_coins --include=*.cpp --include=*.h --include=*.data.h)",
+      "Bash(grep -rn \"#ifndef\\\\|#define\" C:/Users/aleksandar.mavrov/MyWorkspace/WORK_TOPICS/projects/games/project_source_symlink/game/alpha_family/plugins/burning_hot_coins --include=*.cpp --include=*.h --include=*.data.h)",
+      "Bash(grep -rn burning_hot_coins C:/Users/aleksandar.mavrov/MyWorkspace/WORK_TOPICS/projects/games/project_source_symlink/game/alpha_family/plugins/burning_hot_coins --include=*.cpp --include=*.h --include=*.data.h)",
+      "Bash(for d:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/aleksandar.mavrov/MyWorkspace/WORK_TOPICS/projects/games/tasks/game-creator/**)",
+      "Bash(done)",
+      "Bash(python install.py \"C:/mklinks/games\" --dry-run)",
+      "Bash(python install.py \"../..\" --dry-run)",
+      "Bash(python install.py \"C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\" --force)",
+      "Bash(python install.py \"C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\" --update)"
+    ]
+  }
+}

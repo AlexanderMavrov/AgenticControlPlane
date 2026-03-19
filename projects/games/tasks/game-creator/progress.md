@@ -1,6 +1,6 @@
 # Прогрес: Game Creator
 
-**Последна актуализация:** 2026-03-17
+**Последна актуализация:** 2026-03-19
 
 ---
 
@@ -31,19 +31,20 @@
 - [x] `install.py` — standalone installer за `.agent/tools/`
 - [x] `dist/SPEC.md` — design spec (v0.2)
 
-## Фаза 3: Workflow ⏳
-- [ ] `workflow.yaml` — 7 стъпки (виж `dist/SPEC.md` + `WORKFLOW_REQUIREMENTS.md`)
-- [ ] Стъпка VALIDATE_CONFIG (WR-001, WR-011, WR-012, WR-013)
-- [ ] Стъпка CREATE_GAME_MODULE (WR-006, WR-008)
-- [ ] Стъпка CREATE_CONFIGS (WR-009)
-- [ ] Стъпка CREATE_RESOURCES (WR-002, WR-003, WR-004, WR-007)
-- [ ] Стъпка RESOLVE_ASSETS — 3-tier архитектура (WR-015, WR-016, WR-017, WR-018)
-- [ ] Стъпка CREATE_INTEGRATIONS (WR-008)
-- [ ] Стъпка UPDATE_CMAKE (WR-005)
-- [ ] Struct schemas за всяка стъпка
-- [ ] Обновяване на `install.py` с workflow copy
+## Фаза 3: Workflow ✅
+- [x] `workflow.yaml` — 8 стъпки (итеративно разработени, верифицирани срещу source code)
+- [x] Step 1: `copy-and-rename-plugin` — копиране на plugin dir + rename dirs/files (WR-006)
+- [x] Step 2: `rename-in-source-files` — find/replace в .cpp/.h/.data.h и CMakeLists.txt (WR-006, WR-008)
+- [x] Step 3: `register-in-root-cmake` — добавяне в EGT_BUILD_GAME_LIST (WR-005)
+- [x] Step 4: `create-configs` — copy configs/, rename, global replace, math setup update (WR-009)
+- [x] Step 5: `create-resources` — copy resources/, math file, RssRawData, optional overlay (WR-002, WR-003, WR-004, WR-007)
+- [x] Step 6: `create-integrations` — per integration: copy/rename, 4-way text replace (WR-008)
+- [x] Step 7: `create-playground-manifest` — copy playground configs/, update manifest.json
+- [x] Step 8: `validate-and-build` — filesystem scan, CMake configure + build validation
+- [x] Struct schemas за всяка стъпка (8 schema файла)
+- [x] Обновяване на `install.py` с workflow copy (10 файла: tool + workflow.yaml + 8 schemas)
 
 ## Фаза 4: Testing & Integration ⏳
-- [ ] End-to-end тест: клониране на реална игра (burning_hot_coins → dragon_fortune)
-- [ ] Провери ModuleManager_*.json — game-specific или идентични?
-- [ ] Провери integration app .cpp template
+- [ ] End-to-end тест: клониране на реална игра (burning_hot_coins → test game)
+- [ ] Обновяване на `dist/SPEC.md` да отразява финалната workflow структура
+- [ ] Проверка дали `displayName` трябва да се записва някъде (config го има, но нито един step не го използва)

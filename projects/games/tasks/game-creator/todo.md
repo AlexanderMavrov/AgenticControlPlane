@@ -2,31 +2,27 @@
 
 ---
 
-## Фаза 1 & 2 ✅ — Research + Config UI
+## Фаза 1, 2 & 3 ✅ — Research + Config UI + Workflow
 Завършени. Виж `progress.md` за детайли.
 
 ---
 
-## Фаза 3: Workflow (следваща)
+## Фаза 4: Testing & Integration (следваща)
 
-### Преди да започнеш workflow имплементацията — провери:
-- [ ] `configs/{game}/modules/ModuleManager_*.json` — идентични ли са за всички игри или game-specific? (`C:/mklinks/games/configs/`)
-- [ ] Integration app `.cpp` template — колко boilerplate е общ между игрите? (`C:/mklinks/games/integration/astro/apps/src/Egt/`)
-- [ ] Как точно се регистрира integration app в integration-level CMakeLists.txt? Нужна ли е промяна там?
+### Преди end-to-end тест:
+- [x] Обнови `install.py` да копира workflow файловете (`workflow.yaml` + `structs/`) в `.agent/workflows/game-creator/`
+- [ ] Обнови `dist/SPEC.md` да отразява финалната workflow структура (8 стъпки вместо 7)
 
-### Workflow стъпки за имплементация:
-- [ ] **VALIDATE_CONFIG** — schema check, name conflict, prototype exists, math file paths (WR-001, WR-011, WR-012, WR-013)
-- [ ] **CREATE_GAME_MODULE** — copy plugins/{prototype}/ → {newGame}/; search-replace всички naming форми (WR-006)
-- [ ] **CREATE_CONFIGS** — copy configs/{prototype}/ → {newGame}/; rename JSON файлове (WR-009)
-- [ ] **CREATE_RESOURCES** — copy resources/{prototype}/ → {newGame}/; валидация symbol count (WR-004, WR-012)
-- [ ] **RESOLVE_ASSETS** — 3-tier: auto (prefix replace) → inferred (LLM fuzzy) → human (пита + записва) (WR-015..018)
-- [ ] **CREATE_INTEGRATIONS** — за всеки integration: copy + search-replace app файловете (WR-008)
-- [ ] **UPDATE_CMAKE** — добави snakeName в EGT_BUILD_GAME_LIST (WR-005)
+### Open questions:
+- [ ] `displayName` — config-ът го има, но нито един step не го използва. Трябва ли да се записва някъде? (playground manifest? UI label?)
+- [ ] RESOLVE_ASSETS (3-tier) — отложен за v2. Текущият workflow поддържа само "reuse" и "overlay" mode чрез Step 5.
+- [ ] Gate конфигурация за Step 8 (validate-and-build) — дали `human: true` е по-подходящо за последната стъпка?
 
-### Инфраструктура:
-- [ ] `workflow.yaml` структура (виж agentic-control-plane docs за формата)
-- [ ] Struct schemas за inputs/outputs на всяка стъпка
-- [ ] Добави workflow copy в `install.py`
+### End-to-end тест:
+- [ ] Генерирай `game-creator-config.json` чрез UI-а за test game (burning_hot_coins → test_dragon)
+- [ ] Стартирай workflow-а в agentic-control-plane
+- [ ] Провери всеки step report за грешки
+- [ ] Верифицирай CMake configure + build успех
 
 ---
 
@@ -41,3 +37,10 @@
 - [x] Config-ът натрупва `assetResolutions[]` — decision log за reuse при следващ clone
 - [x] italy_games ресурси са несъвместими с overlay — извън scope v1
 - [x] Без rollback в v1 (WR-010)
+- [x] Workflow е 8 стъпки (не 7 от SPEC.md) — validate-and-build добавена като финална стъпка
+- [x] 6 naming variants: oldPascal/pascalName, prototype/snakeName, oldLower/newLower, oldUpper/newUpper
+- [x] Всички стъпки са generic (scan-based), не hardcoded за конкретна игра
+- [x] Integration-level CMakeLists.txt НЕ се модифицира — auto-discovery чрез foreach+egt_pascal_case
+- [x] Playground manifest id е споделено (2121) — не е уникално per game
+- [x] ModuleManager_Playtech_Server.json има собствено копие на math setup config — Step 4 сканира всички файлове
+- [x] Playtech има 3+ sub-components (Client, Server, Database, Bot) — Step 6 сканира всички

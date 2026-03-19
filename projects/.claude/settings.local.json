@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rmdir 'C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink')",
+      "Bash(cmd //c \"mklink /D \"\"C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\"\" \"\"C:\\\\Workspace\\\\games\"\"\")",
+      "Bash(ln:*)",
+      "Bash(cmd.exe /c \"mklink /J C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink C:\\\\Workspace\\\\games\")",
+      "Bash(cmd.exe /c \"mklink /J C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink C:\\\\Workspace\\\\italy_games\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink\")",
+      "Bash(cmd.exe /c \"dir /AL C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\")",
+      "Bash(cmd.exe /c \"rmdir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink && mklink /J C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink C:\\\\Workspace\\\\italy_games\")",
+      "Bash(cmd.exe //c \"echo hello\")",
+      "Bash(cmd.exe //c \"dir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\\")",
+      "Bash(cmd.exe //c \"dir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\")",
+      "Bash(cmd.exe //c \"rmdir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink\")",
+      "Bash(cmd.exe //c \"mklink /J C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink C:\\\\Workspace\\\\italy_games\")",
+      "Bash(cmd.exe //c \"dir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\")",
+      "Bash(cmd.exe //c \"dir /AL C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\")",
+      "Bash(cmd.exe //c \"dir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\")",
+      "Bash(cmd.exe //c \"rmdir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\")",
+      "Bash(cmd.exe //c \"dir C:\\\\Workspace\\\\games\")",
+      "Bash(cmd.exe //c \"dir C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\\\\CMakeLists.txt\")",
+      "Bash(cmd.exe //c \"fsutil reparsepoint query C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink\")",
+      "Bash(cmd.exe //c \"mklink /J C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\games\\\\project_source_symlink C:\\\\Workspace\\\\games\")",
+      "Bash(cmd.exe //c \"fsutil reparsepoint query C:\\\\Users\\\\aleksandar.mavrov\\\\MyWorkspace\\\\WORK_TOPICS\\\\projects\\\\italy_games\\\\project_source_symlink\")"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+name: resources-report
+version: 1
+description: >
+  Report from Step 5 (create-resources).
+  Lists copied resources, math file handling, manifest updates, and optional overlay.
+type: object
+
+required:
+  - resources_path
+  - total_files_copied
+  - math_file_action
+  - manifests_updated
+  - assets_mode
+  - status
+
+properties:
+  resources_path:
+    type: string
+    description: "Absolute path to the new resources directory"
+  total_files_copied:
+    type: integer
+    description: "Total number of files copied from prototype"
+  math_file_action:
+    type: object
+    description: "What happened with the math file"
+    required: [old_path, new_path, action]
+    properties:
+      old_path:
+        type: string
+        description: "Old math file relative path (e.g. math/var_8407.json)"
+      new_path:
+        type: string
+        description: "New math file relative path (e.g. math/var_9200.json)"
+      action:
+        type: string
+        enum: [copied, replaced, skipped]
+      source:
+        type: string
+        description: "Absolute path from which the new math file was copied"
+  manifests_updated:
+    type: array
+    description: "List of manifest files that were modified"
+    items:
+      type: string
+  assets_mode:
+    type: string
+    enum: [reuse, new]
+  overlay_files_count:
+    type: integer
+    description: "Number of files overlaid from resourcesDir (0 if mode=reuse)"
+  decisions:
+    type: array
+    description: "Non-trivial decisions made during this step"
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question:
+          type: string
+          description: "The question or ambiguity that arose"
+        options_considered:
+          type: array
+          items:
+            type: string
+          description: "Potential solutions that were evaluated"
+        resolution:
+          type: string
+          description: "The chosen solution and reasoning"
+        resolved_by:
+          type: string
+          enum: [agent, user]
+          description: "Whether the agent decided autonomously or the user was consulted"
+  errors:
+    type: array
+    description: "Any errors encountered"
+    items:
+      type: string
+  status:
+    type: string
+    enum: [success, partial, failed]

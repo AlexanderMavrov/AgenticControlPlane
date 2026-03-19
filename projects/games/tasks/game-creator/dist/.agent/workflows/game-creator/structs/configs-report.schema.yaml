@@ -1,0 +1,87 @@
+name: configs-report
+version: 1
+description: >
+  Report from Step 4 (create-configs).
+  Lists copied, renamed, and modified config files plus math setup updates.
+type: object
+
+required:
+  - configs_path
+  - files_copied
+  - files_renamed
+  - files_modified
+  - math_setups_updated
+  - status
+
+properties:
+  configs_path:
+    type: string
+    description: "Absolute path to the new configs directory"
+  files_copied:
+    type: integer
+    description: "Total number of files copied"
+  files_renamed:
+    type: array
+    description: "List of files that were renamed"
+    items:
+      type: object
+      required: [from, to]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+  files_modified:
+    type: array
+    description: "List of files with content changes (relative paths)"
+    items:
+      type: string
+  math_setups_updated:
+    type: integer
+    description: "Number of math setup entries updated (id, rtp, mathFile)"
+  math_values:
+    type: object
+    description: "The math values that were applied"
+    properties:
+      old_variant_id:
+        type: string
+      new_variant_id:
+        type: string
+      old_rtp:
+        type: number
+      new_rtp:
+        type: number
+      old_math_file:
+        type: string
+      new_math_file:
+        type: string
+  decisions:
+    type: array
+    description: "Non-trivial decisions made during this step"
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question:
+          type: string
+          description: "The question or ambiguity that arose"
+        options_considered:
+          type: array
+          items:
+            type: string
+          description: "Potential solutions that were evaluated"
+        resolution:
+          type: string
+          description: "The chosen solution and reasoning"
+        resolved_by:
+          type: string
+          enum: [agent, user]
+          description: "Whether the agent decided autonomously or the user was consulted"
+  errors:
+    type: array
+    description: "Any errors encountered"
+    items:
+      type: string
+  status:
+    type: string
+    enum: [success, partial, failed]

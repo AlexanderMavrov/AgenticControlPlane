@@ -12,10 +12,9 @@ Usage:
     python install.py <target> --dry-run    # Preview without writing
 
 What gets installed:
-    <target>/.agent/tools/game-creator.html     ← Config wizard UI
-
-Later (when workflow is ready):
-    <target>/.agent/workflows/game-creator/     ← Workflow definition
+    <target>/.agent/tools/game-creator.html                  ← Config wizard UI
+    <target>/.agent/workflows/templates/my_workflows/game-creator/workflow.yaml   ← Workflow definition
+    <target>/.agent/workflows/templates/my_workflows/game-creator/structs/ ← Struct schemas (8 files)
 """
 
 import os
@@ -114,8 +113,8 @@ def main():
         for k in total:
             total[k] += counts[k]
 
-    # ── [1/1] Tools (.agent/tools/) ──────────────────────────────────────────
-    print("[1/1] UI Tool (.agent/tools/)")
+    # ── [1/2] Tools (.agent/tools/) ──────────────────────────────────────────
+    print("[1/2] UI Tool (.agent/tools/)")
     src_tools = os.path.join(script_dir, '.agent', 'tools')
     dst_tools = os.path.join(target, '.agent', 'tools')
     if os.path.isdir(src_tools):
@@ -128,18 +127,22 @@ def main():
         print("  WARN  .agent/tools/ not found in dist — skipping")
     print()
 
-    # ── [Future] Workflow (.agent/workflows/game-creator/) ───────────────────
+    # ── [2/2] Workflow (.agent/workflows/templates/my_workflows/game-creator/)
+    print("[2/2] Workflow (.agent/workflows/templates/my_workflows/game-creator/)")
     src_wf = os.path.join(script_dir, '.agent', 'workflows', 'game-creator')
-    dst_wf = os.path.join(target, '.agent', 'workflows', 'game-creator')
+    dst_wf = os.path.join(target, '.agent', 'workflows', 'templates', 'my_workflows', 'game-creator')
     if os.path.isdir(src_wf):
-        print("[+] Workflow (.agent/workflows/game-creator/)")
         counts = copy_tree(src_wf, dst_wf,
                            force=args.force, update=args.update, dry_run=args.dry_run)
         merge(counts)
-        print()
+        if not any(counts[k] > 0 for k in ('new', 'updated')):
+            print("  (no changes)")
+    else:
+        print("  WARN  .agent/workflows/game-creator/ not found in dist — skipping")
+    print()
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    print("─" * 50)
+    print("-" * 50)
     print(f"Done.  new={total['new']}  updated={total['updated']}  "
           f"unchanged={total['unchanged']}  skipped={total['skipped']}")
     if args.dry_run:

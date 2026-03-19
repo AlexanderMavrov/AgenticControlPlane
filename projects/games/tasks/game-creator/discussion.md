@@ -5,6 +5,97 @@
 
 ---
 
+### 2026-03-19 — Behavioral Rules + Decision Tracking в стъпките
+
+**Контекст:** Дискусия за как LLM subagent-ите да се справят с edge cases и неясноти по време на изпълнение.
+
+#### Проблемът
+
+Workflow стъпките са generic, но реалните игри имат edge cases — нестандартна структура, допълнителни файлове, нетипични конфигурации. Subagent-ът трябва да може да пита потребителя и да записва решенията, за да не се губи знание между runs.
+
+#### Решение: Behavioral Rules блок + decisions поле
+
+Добавихме `== Behavioral Rules ==` секция към goal-а на всяка стъпка с 4 правила:
+
+1. **ATTEMPT FIRST** — опитай самостоятелно на база инструкциите
+2. **ASK ON AMBIGUITY** — при неясноти/съмнения СПРИ и питай потребителя; предложи потенциални решения с pros/cons, но потребителят валидира
+3. **ONLY SPECIFIED CHANGES** — извършвай САМО описаните операции; без добавяне на код, коментари, логика; без промяна на съществуващи логики; ако файл не съдържа pattern за замяна — не го пипай
+4. **RECORD DECISIONS** — записвай всяко нетривиално решение в `decisions` array на report-а
+
+Rule 3 е адаптирано per-step (напр. Step 8: "ONLY VALIDATE — DO NOT FIX").
+
+#### Decision schema (добавена към всички 8 struct schemas)
+
+```yaml
+decisions:
+  type: array
+  items:
+    question: string           # какъв въпрос възникна
+    options_considered: [str]   # какви варианти бяха разгледани
+    resolution: string         # какво беше избрано и защо
+    resolved_by: agent|user    # кой реши
+```
+
+#### Бъдещо разширение: Knowledge file
+
+Обсъдихме идеята за `game-creator-knowledge.yaml` — файл, който натрупва findings от минали runs и се inject-ва на следващите. Отложено за v2 — текущият decision tracking в reports е достатъчен за първата итерация. При нужда, decisions от reports могат да се curate-нат в knowledge file ръчно.
+
+---
+
+### 2026-03-19 — Workflow имплементация завършена (8 стъпки)
+
+**Контекст:** Итеративно изграждане на `workflow.yaml` — по една стъпка, с верификация срещу source code на проекта (burning_hot_coins като reference).
+
+#### Финална структура на workflow-а
+
+| # | Step | Какво прави |
+|---|------|-------------|
+| 1 | `copy-and-rename-plugin` | Копира plugin dir, rename dirs/files (oldPascal→pascalName, prototype→snakeName) |
+| 2 | `rename-in-source-files` | Find/replace в .cpp/.h/.data.h и CMakeLists.txt |
+| 3 | `register-in-root-cmake` | Добавя snakeName в EGT_BUILD_GAME_LIST |
+| 4 | `create-configs` | Copy configs/, rename files, global replace, update math setup values |
+| 5 | `create-resources` | Copy resources/, replace math file, update RssRawData.json, optional overlay |
+| 6 | `create-integrations` | Per integration: copy/rename dirs, rename files, 4-way text replace |
+| 7 | `create-playground-manifest` | Copy playground configs/, update manifest.json (skip ако няма playground) |
+| 8 | `validate-and-build` | Filesystem scan за stale refs, CMake configure + build |
+
+#### Ключови находки по време на имплементацията
+
+**6 naming variants** (не 2 както първоначално мислехме):
+- `{oldPascal}` → `{pascalName}` — class names, includes, module names
+- `{prototype}` → `{snakeName}` — snake_case refs, game IDs, resource paths
+- `{oldLower}` → `{newLower}` — Playtech game name, executable targets (astroburninghotcoins)
+- `{oldUpper}` → `{newUpper}` — export macros (EGT_PLAYGROUND_BURNINGHOTCOINS_EXPORT)
+
+Steps 1-2 използват само първите 2 варианта (plugin source код).
+Step 6 (integrations) използва всичките 4.
+
+**Plugin CMakeLists.txt — изненади:**
+- Module-level CMakeLists.txt (вътре в src/Egt/XxxFsm/) **НЕ** съдържат game name — `egt_create_static_library` извлича името от директорията
+- Top-level plugin CMakeLists.txt има `add_subdirectory(src/Egt/BurningHotCoinsFsm)` — PascalCase
+- Затова Step 2 прави и oldPascal→pascalName В CMakeLists.txt файлове
+
+**Auto-discovery — нищо за промяна:**
+- Всички integration-level CMakeLists.txt използват `foreach(game IN LISTS EGT_BUILD_GAME_LIST)` + `egt_pascal_case()`
+- Добавянето в EGT_BUILD_GAME_LIST (Step 3) е достатъчно — CMake автоматично намира новите dirs
+
+**Playtech сложност:**
+- 3-4 sub-components per game: Client, Server, Database, Bot
+- Auto-discovery с `foreach(suffix IN ITEMS "Database" "Client" "Server" "Bot")`
+- ModuleManager_Playtech_Server.json — собствено копие на math config (трябва да се update в Step 4)
+
+**RESOLVE_ASSETS (3-tier) — отложен за v2:**
+- Текущият workflow поддържа само "reuse" (1:1 copy) и "overlay" (потребителят дава готова директория)
+- 3-tier auto/inferred/human resolution ще се добави в бъдеща версия
+
+#### Подход и методология
+
+- Всяка стъпка беше дискутирана преди писане — потребителят даваше описание, анализирахме source code, после записвахме в workflow.yaml
+- КРИТИЧЕН feedback: "burning hot е само пример — правилата трябва да са generic" → всички стъпки сканират actual dirs, не hardcode-ват конкретни файлове
+- Struct schemas за всяка стъпка — gate-check.py валидира output-а
+
+---
+
 ### 2026-03-18 — Agentic Control Plane интеграция + Workflow стратегия
 
 **Контекст:** Потребителят добави папка `agentic-control-plane/` вътре в task директорията. Запознахме се с нея и дефинирахме как game-creator workflow-ът ще се изгражда и изпълнява.
@@ -209,7 +300,7 @@ resources/{game}/math/var_*.json → symbolsData.symbolNames
 - **Workflow engine:** Ще използваме съществуващия agentic-control-plane workflow engine — game-creator ще дефинира нов workflow.yaml
 - **Две компоненти:** (1) UI за генериране на config + (2) LLM workflow за изпълнение на клонирането
 - **Собствен install.py** за game-creator (не разширение на agentic-control-plane)
-- **Workflow** отива в `.agent/workflows/game-creator/` (user space, не predefined)
+- **Workflow** отива в `.agent/workflows/templates/my_workflows/game-creator/` (user space, не predefined)
 
 **Отворени въпроси:**
 - Трябва ли workflow-ът да поддържа отмяна (rollback) при failure?

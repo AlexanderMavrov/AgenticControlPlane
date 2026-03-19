@@ -15,7 +15,7 @@
 
 **Двe компоненти:**
 1. **Config UI** (`game-creator.html`) — browser-based wizard, генерира JSON config. **✅ Имплементиран (v2).**
-2. **Workflow** (`workflow.yaml`) — agentic-control-plane workflow, чете config и изпълнява клонирането. **⏳ Предстои.**
+2. **Workflow** (`workflow.yaml`) — agentic-control-plane workflow, чете config и изпълнява клонирането. **✅ Имплементиран (8 стъпки).**
 
 **UI Wizard — текущи стъпки (v2):**
 1. Прототип — избор от grid или ръчно въвеждане
@@ -55,10 +55,15 @@
 
 - ✅ UI wizard за генериране на config
 - ✅ install.py за копиране в `.agent/tools/`
-- ⏳ Workflow (7 стъпки) за автоматично клониране:
-  - VALIDATE_CONFIG, CREATE_GAME_MODULE, CREATE_CONFIGS, CREATE_RESOURCES
-  - **RESOLVE_ASSETS** (3-tier asset resolution — виж WR-015..018)
-  - CREATE_INTEGRATIONS, UPDATE_CMAKE
+- ✅ Workflow (8 стъпки) за автоматично клониране:
+  1. `copy-and-rename-plugin` — копиране на plugin dir + rename
+  2. `rename-in-source-files` — find/replace в source файлове
+  3. `register-in-root-cmake` — регистрация в EGT_BUILD_GAME_LIST
+  4. `create-configs` — config файлове + math setup update
+  5. `create-resources` — ресурси + math file + optional overlay
+  6. `create-integrations` — per integration copy + 4-way replace
+  7. `create-playground-manifest` — playground configs + manifest.json
+  8. `validate-and-build` — filesystem validation + CMake configure + build
 
 ## Deliverables
 
@@ -69,7 +74,8 @@
 | 3 | Workflow requirements | `WORKFLOW_REQUIREMENTS.md` | ✅ Активен (WR-001..018) |
 | 4 | Config UI | `dist/.agent/tools/game-creator.html` | ✅ Завършен (v2) |
 | 5 | Installer | `dist/install.py` | ✅ Завършен |
-| 6 | Workflow YAML | `dist/.agent/workflows/game-creator/workflow.yaml` | ⏳ Предстои |
+| 6 | Workflow YAML | `dist/.agent/workflows/game-creator/workflow.yaml` | ✅ Завършен (8 стъпки) |
+| 7 | Struct schemas | `dist/.agent/workflows/game-creator/structs/*.schema.yaml` | ✅ Завършени (8 файла) |
 
 ## Ключови находки (summary)
 
