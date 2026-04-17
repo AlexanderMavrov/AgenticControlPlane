@@ -1,0 +1,197 @@
+name: game-model-report
+version: 1
+description: >
+  Structured model of a game's visual elements, built from resource files.
+  Contains all view elements, idata configs, math data, and RSS registry.
+type: object
+
+required:
+  - gameName
+  - resolution
+  - views
+  - rssRegistry
+  - fileInventory
+  - status
+
+properties:
+  gameName:
+    type: string
+    description: "Game name derived from resources path"
+  resolution:
+    type: string
+    description: "Resolution checked (e.g. 1920x1080)"
+  screenWidth:
+    type: integer
+    description: "Screen width in pixels"
+  screenHeight:
+    type: integer
+    description: "Screen height in pixels"
+
+  views:
+    type: object
+    description: >
+      All view files, keyed by view name (e.g. GameBackgroundView).
+      Each contains the parsed elements array and element count.
+    additionalProperties:
+      type: object
+      properties:
+        elements:
+          type: array
+          description: "Raw parsed elements from the view JSON"
+        elementCount:
+          type: integer
+
+  swButtons:
+    type: object
+    description: >
+      SwButton view files, keyed by view name (e.g. ExitGameSwButtonView).
+    additionalProperties:
+      type: object
+      properties:
+        elements:
+          type: array
+        elementCount:
+          type: integer
+
+  idataReels:
+    type: object
+    description: "Reel grid config from idata/ReelsView.json"
+    properties:
+      visibleCols:
+        type: integer
+      visibleRows:
+        type: integer
+      reelAreaX:
+        type: integer
+      reelAreaY:
+        type: integer
+      reelStepX:
+        type: integer
+      reelStepY:
+        type: integer
+      symbolCount:
+        type: integer
+      symbols:
+        type: array
+        items:
+          type: object
+          properties:
+            id: { type: integer }
+            rssId: { type: string }
+            name: { type: string }
+
+  idataWinFigures:
+    type: object
+    description: "Win figure animation mappings from idata/WinFiguresView.json"
+    properties:
+      reelAreaX: { type: integer }
+      reelAreaY: { type: integer }
+      reelStepX: { type: integer }
+      reelStepY: { type: integer }
+      figureKeys:
+        type: object
+        description: "Map of symbol ID to animation RSS key"
+
+  idataLines:
+    type: object
+    description: "Win lines config from idata/LinesView.json"
+    properties:
+      lineCount: { type: integer }
+      reelAreaX: { type: integer }
+      reelAreaY: { type: integer }
+      reelStepX: { type: integer }
+      reelStepY: { type: integer }
+      winSoundKeys:
+        type: object
+        description: "Map of symbol ID to win sound RSS key"
+
+  idataStatusLine:
+    type: object
+    description: "Status line config from idata/StatusLineView.json"
+    properties:
+      midPoint:
+        type: object
+        properties:
+          x: { type: number }
+          y: { type: number }
+
+  math:
+    type: object
+    description: "Math file data"
+    properties:
+      sourceFile:
+        type: string
+        description: "Path to math file used"
+      reelsCount: { type: integer }
+      rowsCount: { type: integer }
+      symbolNames:
+        type: array
+        items: { type: string }
+      wildId: { type: integer }
+      scatterIds:
+        type: array
+        items: { type: integer }
+
+  rssRegistry:
+    type: object
+    description: "Registry of all RSS IDs by type"
+    required: [images, animations, styles]
+    properties:
+      images:
+        type: array
+        items: { type: string }
+        description: "All image RSS IDs from RssImagesData"
+      animations:
+        type: array
+        items: { type: string }
+        description: "All animation RSS IDs from RssImagesSeqData"
+      sounds:
+        type: array
+        items: { type: string }
+        description: "All sound RSS IDs from RssAudioData"
+      styles:
+        type: array
+        items: { type: string }
+        description: "All text style IDs from RssTextStylesData"
+
+  fileInventory:
+    type: object
+    description: "Lists of all files read"
+    properties:
+      viewFiles:
+        type: array
+        items: { type: string }
+      swButtonFiles:
+        type: array
+        items: { type: string }
+      idataFiles:
+        type: array
+        items: { type: string }
+      mathFile: { type: string }
+      rssManifests:
+        type: array
+        items: { type: string }
+
+  errors:
+    type: array
+    description: "Files that could not be read"
+    items: { type: string }
+
+  decisions:
+    type: array
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question: { type: string }
+        options_considered:
+          type: array
+          items: { type: string }
+        resolution: { type: string }
+        resolved_by:
+          type: string
+          enum: [agent, user]
+
+  status:
+    type: string
+    enum: [success, partial, failed]

@@ -1,0 +1,79 @@
+name: hook-diagnostic
+version: 2
+description: >
+  Fast diagnostic workflow — tests whether the Cursor subagentStop hook
+  fires correctly, gate-check.py processes input, and the trace system
+  captures data. 3 lightweight steps, each testing a different scenario.
+  After running, check:
+    .agent/gate-check-invocations.log  (was the hook invoked?)
+    .agent/gate-check-error.log        (did gate-check.py error?)
+    gate-result.json                   (was structural validation run?)
+    trace/                             (was trace data captured?)
+
+params:
+  - name: message
+    description: A short message for the subagent to echo back.
+    required: false
+    default: "hook-diagnostic test"
+
+gate:
+  structural: true
+  semantic: false
+  human: false
+  max_gate_retries: 2
+  max_step_retries: 1
+
+steps:
+  # Step 1: Minimal — does the hook fire at all?
+  # No outputs, no struct validation. If gate-check.py fires,
+  # it will log to invocations.log and write a trace entry.
+  - name: probe-hook
+    goal: >
+      This is a diagnostic step. Do ONE thing: write a single line
+      to data/probe-result.txt containing the current timestamp.
+      Nothing else. Do not read any files. Do not analyze anything.
+    subagent: true
+    spec_check: false
+    outputs:
+      - path: data/probe-result.txt
+    gate:
+      structural: true
+      semantic: false
+      human: false
+
+  # Step 2: Struct validation — does gate-check.py validate output schemas?
+  # Has a struct schema, so gate-check.py must find and validate it.
+  - name: probe-struct
+    goal: >
+      Write a valid JSON file to data/diagnostic-output.json following
+      the struct schema at structs/diagnostic-output.schema.yaml.
+      Read the schema first, then write a minimal valid file.
+    subagent: true
+    spec_check: false
+    outputs:
+      - path: data/diagnostic-output.json
+        struct: diagnostic-output
+    gate:
+      structural: true
+      semantic: false
+      human: false
+
+  # Step 3: Intentional failure — does the retry loop work?
+  # Subagent is told to write INVALID output. Gate should fail,
+  # subagent should get followup_message with failure details,
+  # and retry. On retry, write valid output.
+  - name: probe-retry
+    goal: >
+      FIRST ATTEMPT: Write an INTENTIONALLY INVALID JSON file to
+      data/retry-test.json — write {"invalid": true} (missing required fields).
+      AFTER RECEIVING GATE FEEDBACK: Read the struct schema at
+      structs/retry-test.schema.yaml and write a VALID file.
+    subagent: true
+    spec_check: false
+    outputs:
+      - path: data/retry-test.json
+        struct: retry-test
+    gate:
+      structural: true
+      semantic: false
+      human: false

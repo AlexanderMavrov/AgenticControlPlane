@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "workflow_engine": {
+      "command": "python",
+      "args": [".agent/mcp/workflow-engine.py"]
+    },
+    "workflow_tools": {
+      "command": "python",
+      "args": [".agent/mcp/workflow-tools-loader.py"]
+    }
+  }
+}

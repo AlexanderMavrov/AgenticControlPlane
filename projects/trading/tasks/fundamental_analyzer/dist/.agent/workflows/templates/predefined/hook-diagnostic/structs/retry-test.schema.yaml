@@ -1,0 +1,18 @@
+name: retry-test
+version: 1
+description: Schema for retry diagnostic — subagent must write valid output after gate failure.
+type: object
+required:
+  - status
+  - attempt
+  - fixed_after_feedback
+properties:
+  status:
+    type: string
+    description: "Must be 'ok'"
+  attempt:
+    type: integer
+    description: Which attempt number produced this output (should be 2+)
+  fixed_after_feedback:
+    type: boolean
+    description: "Must be true — confirms subagent received and acted on gate feedback"

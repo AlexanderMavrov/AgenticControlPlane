@@ -1,0 +1,3194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflow Editor</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --bg-card: #ffffff;
+    --bg-hover: #eef0f5;
+    --bg-section: #f8f9fb;
+    --text: #1c1f2e;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --border: #c2c9d6;
+    --border-light: #b8bfce;
+    --accent: #4a6fe8;
+    --accent-light: #eaeffb;
+    --green:    #2f9e5a;   --green-bg:   #edf7f2;
+    --red:      #d94747;   --red-bg:     #fdeaea;
+    --amber:    #b87316;   --amber-bg:   #fef5e4;
+    --blue:     #3878c2;   --blue-bg:    #e8f0fb;
+    --purple:   #7048c8;   --purple-bg:  #f0ebff;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+    --radius: 12px;
+    --radius-sm: 7px;
+    --radius-xs: 4px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117;
+    --bg-card: #161b22;
+    --bg-hover: #1e242c;
+    --bg-section: #1a2030;
+    --text: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6a7585;
+    --border: #2d343d;
+    --border-light: #252c36;
+    --accent: #7090f4;
+    --accent-light: #131e40;
+    --green:    #52c880;   --green-bg:   #0d2618;
+    --red:      #e87070;   --red-bg:     #2d1010;
+    --amber:    #d4963a;   --amber-bg:   #261a00;
+    --blue:     #6aa8e8;   --blue-bg:    #0c1f36;
+    --purple:   #a882e8;   --purple-bg:  #1a1030;
+    --shadow: 0 1px 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+    flex-wrap: wrap;
+  }
+  .header-logo { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; white-space: nowrap; }
+  .header-logo span { opacity: 0.45; font-weight: 400; margin-left: 2px; }
+  .header-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: var(--font);
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .btn-primary:hover { opacity: 0.88; background: var(--accent); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-danger { color: var(--red); border-color: var(--red); }
+  .btn-danger:hover { background: var(--red-bg); }
+
+  /* ── Tab bar ─────────────────────────────────────────── */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .tab {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text-secondary); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Main layout ─────────────────────────────────────── */
+  .main-container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+  }
+  .main-container.with-preview {
+    max-width: 1400px;
+    display: flex;
+    gap: 24px;
+  }
+  .editor-pane { flex: 1; min-width: 0; }
+  .preview-pane {
+    width: 40%;
+    min-width: 340px;
+    max-height: calc(100vh - 120px);
+    position: sticky;
+    top: 80px;
+    overflow: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .preview-header {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 5;
+  }
+  .preview-body {
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text-secondary);
+  }
+  .preview-body .yk { color: var(--accent); }
+  .preview-body .yv { color: var(--green); }
+  .preview-body .yc { color: var(--text-muted); }
+
+  /* ── Drop zone ─────────────────────────────────────── */
+  .drop-zone {
+    max-width: 640px;
+    margin: 80px auto;
+    padding: 60px 40px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+  .drop-zone h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .drop-zone p { color: var(--text-muted); font-size: 14px; }
+
+  /* ── Cards ─────────────────────────────────────────── */
+  .section-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .section-header:hover { background: var(--bg-hover); }
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+  .section-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .section-body { padding: 0 16px 16px; }
+  .section-card.collapsed .section-body { display: none; }
+  .section-chevron {
+    width: 16px; height: 16px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .section-card.collapsed .section-chevron { transform: rotate(-90deg); }
+
+  /* ── Step cards ─────────────────────────────────────── */
+  .step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+  .step-card:hover { box-shadow: var(--shadow-lg); }
+  .step-header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .step-header:hover { background: var(--bg-hover); }
+  .step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-name {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .step-name.empty { color: var(--text-muted); font-style: italic; }
+  .step-chips { display: flex; gap: 6px; flex-shrink: 0; }
+  .chip {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 8px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip-blue { background: var(--blue-bg); color: var(--blue); }
+  .chip-purple { background: var(--purple-bg); color: var(--purple); }
+  .chip-green { background: var(--green-bg); color: var(--green); }
+  .chip-amber { background: var(--amber-bg); color: var(--amber); }
+  .step-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .step-actions .btn-icon {
+    width: 28px; height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .step-actions .btn-icon:hover { background: var(--bg-hover); color: var(--text); }
+  .step-actions .btn-icon.danger:hover { background: var(--red-bg); color: var(--red); }
+  .step-details { padding: 0 16px 16px; }
+  .step-card.collapsed .step-details { display: none; }
+  .step-chevron {
+    width: 16px; height: 16px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .step-card.collapsed .step-chevron { transform: rotate(-90deg); }
+
+  /* ── Form fields ─────────────────────────────────────── */
+  .field-group {
+    margin-bottom: 14px;
+  }
+  .field-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .field-row > .field-group { flex: 1; margin-bottom: 0; }
+  .field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .field-label .required { color: var(--red); }
+  .field-input, .field-textarea, .field-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-section);
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  .field-input:focus, .field-textarea:focus, .field-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+  }
+  .field-input.error, .field-textarea.error, .field-select.error {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px var(--red-bg);
+  }
+  .field-input.warning, .field-textarea.warning {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px var(--amber-bg);
+  }
+  .field-textarea {
+    resize: vertical;
+    min-height: 60px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .field-textarea.goal { min-height: 120px; }
+  .field-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+  }
+  .field-error {
+    font-size: 11px;
+    color: var(--red);
+    margin-top: 3px;
+  }
+  .field-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .field-input-sm { max-width: 100px; }
+  .field-input-num { max-width: 80px; text-align: center; }
+
+  /* ── Checkboxes ─────────────────────────────────────── */
+  .check-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .check-group input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .check-label {
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  /* ── Step config chips (trace-viewer style) ─────────── */
+  .step-config-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .step-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.15s;
+  }
+  .step-chip:hover { opacity: 0.8; }
+  .step-chip-key { opacity: 0.75; }
+  .step-chip-on      { background: var(--green-bg);  color: var(--green);  }
+  .step-chip-off     { background: var(--bg-hover);  color: var(--text-muted);  border-color: var(--border-light); }
+  .step-chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .step-chip-on  .step-chip-dot { background: var(--green); }
+  .step-chip-off .step-chip-dot { background: var(--text-muted); }
+  .step-chip-override { outline: 1px dashed var(--accent); outline-offset: 1px; }
+
+  /* ── Help tooltip ─────────────────────────────────────── */
+  .help-btn {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-section);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .help-btn:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  /* ── Help Modal ──────────────────────────────────────── */
+  .help-modal { display:none; position:fixed; inset:0; z-index:10000; align-items:center; justify-content:center; }
+  .help-modal.visible { display:flex; }
+  .help-modal-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.25); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+  [data-theme="dark"] .help-modal-backdrop { background:rgba(0,0,0,0.5); }
+  .help-modal-content {
+    position:relative; z-index:1; width:520px; max-width:92vw; max-height:80vh;
+    background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:0 16px 48px rgba(0,0,0,0.18); display:flex; flex-direction:column;
+    animation: helpModalIn 0.18s ease-out;
+  }
+  @keyframes helpModalIn { from { opacity:0; transform:translateY(8px) scale(0.97); } to { opacity:1; transform:none; } }
+  .help-modal-header {
+    display:flex; align-items:center; justify-content:space-between; padding:14px 18px 10px;
+    border-bottom:1px solid var(--border-light);
+  }
+  .help-modal-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary); }
+  .help-modal-close {
+    width:28px; height:28px; border:none; background:var(--bg-hover); color:var(--text-muted);
+    border-radius:var(--radius-xs); cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center;
+    transition:background 0.12s, color 0.12s;
+  }
+  .help-modal-close:hover { background:var(--red-bg); color:var(--red); }
+  .help-modal-body { padding:16px 18px 18px; overflow-y:auto; font-size:13px; line-height:1.65; color:var(--text); }
+  .help-modal-body .help-text { color:var(--text-secondary); margin-bottom:14px; }
+  .help-modal-body .help-diagram { margin-top:2px; }
+  .help-modal-body .help-diagram svg { width:100%; height:auto; display:block; }
+  /* SVG diagram theming */
+  .help-diagram .node { rx:6; ry:6; stroke-width:1.5; }
+  .help-diagram .node-green { fill:var(--green-bg); stroke:var(--green); }
+  .help-diagram .node-red { fill:var(--red-bg); stroke:var(--red); }
+  .help-diagram .node-blue { fill:var(--blue-bg); stroke:var(--blue); }
+  .help-diagram .node-purple { fill:var(--purple-bg); stroke:var(--purple); }
+  .help-diagram .node-amber { fill:var(--amber-bg); stroke:var(--amber); }
+  .help-diagram .node-muted { fill:var(--bg-hover); stroke:var(--border); }
+  .help-diagram .node-accent { fill:var(--accent-light); stroke:var(--accent); }
+  .help-diagram .lbl { font-family:var(--font); font-size:11px; fill:var(--text); text-anchor:middle; dominant-baseline:central; }
+  .help-diagram .lbl-sm { font-size:9.5px; fill:var(--text-muted); }
+  .help-diagram .lbl-green { fill:var(--green); }
+  .help-diagram .lbl-red { fill:var(--red); }
+  .help-diagram .lbl-blue { fill:var(--blue); }
+  .help-diagram .lbl-purple { fill:var(--purple); }
+  .help-diagram .lbl-amber { fill:var(--amber); }
+  .help-diagram .lbl-accent { fill:var(--accent); }
+  .help-diagram .arrow { stroke:var(--text-muted); stroke-width:1.2; fill:none; marker-end:url(#arrowHead); }
+  .help-diagram .arrow-green { stroke:var(--green); marker-end:url(#arrowGreen); }
+  .help-diagram .arrow-red { stroke:var(--red); marker-end:url(#arrowRed); }
+  .help-diagram .dash { stroke-dasharray:4,3; }
+  /* Toast */
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); padding:8px 20px;
+    background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm);
+    box-shadow:var(--shadow-lg); font-size:12px; color:var(--text-secondary); z-index:10001;
+    animation: toastIn 0.2s ease-out; pointer-events:none;
+  }
+  @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } }
+
+  /* ── List controls ─────────────────────────────────────── */
+  .list-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    background: var(--bg-section);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+  }
+  .list-item > .field-group { flex: 1; margin-bottom: 0; }
+  .list-remove {
+    width: 24px; height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-xs);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .list-remove:hover { background: var(--red-bg); color: var(--red); }
+  .add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-light);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .add-btn:hover { opacity: 0.8; }
+
+  /* ── Gate chips ─────────────────────────────────────── */
+  .gate-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .gate-chip {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .gate-chip-on { background: var(--green-bg); color: var(--green); }
+  .gate-chip-off { background: var(--bg-hover); color: var(--text-muted); }
+  .gate-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ── Separator ─────────────────────────────────────── */
+  .separator {
+    border: none;
+    border-top: 1px solid var(--border-light);
+    margin: 14px 0;
+  }
+
+  /* ── Struct cards in Structs tab ──────────────────── */
+  .struct-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .struct-header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .struct-header:hover { background: var(--bg-hover); }
+  .struct-icon {
+    width: 26px; height: 26px;
+    border-radius: var(--radius-xs);
+    background: var(--purple);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .struct-name {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .struct-name.empty { color: var(--text-muted); font-style: italic; }
+  .struct-details { padding: 0 16px 16px; }
+  .struct-card.collapsed .struct-details { display: none; }
+
+  /* ── Subsection ─────────────────────────────────────── */
+  .subsection {
+    background: var(--bg-section);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .subsection-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  /* ── Empty state ─────────────────────────────────────── */
+  .empty-state {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* ── Utility ─────────────────────────────────────────── */
+  .hidden { display: none !important; }
+  .mono { font-family: var(--mono); }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  .mb-0 { margin-bottom: 0; }
+  .mt-8 { margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────── -->
+<div class="header">
+  <div class="header-logo">Workflow<span>Editor</span></div>
+  <div class="header-actions">
+    <button class="btn btn-sm" onclick="newWorkflow()" title="New workflow">New</button>
+    <button class="btn btn-sm" onclick="document.getElementById('fileInput').click()" title="Load YAML file">Load</button>
+    <button class="btn btn-sm" onclick="loadExample()" title="Load example workflow with all features" style="color:var(--purple)">Example</button>
+    <button class="btn btn-sm" onclick="copyYAML()" title="Copy workflow YAML to clipboard">Copy</button>
+    <button class="btn btn-sm btn-primary" onclick="exportYAML()" title="Download workflow.yaml (Ctrl+S)">Export</button>
+    <button class="btn btn-sm" onclick="exportAll()" title="Download workflow.yaml + struct schemas">Export All</button>
+    <button class="btn btn-sm" id="btnPreview" onclick="togglePreview()">Preview</button>
+    <button class="btn btn-sm" id="btnTheme" onclick="toggleTheme()">Dark</button>
+  </div>
+  <input type="file" id="fileInput" accept=".yaml,.yml" class="hidden" onchange="handleFileInput(event)">
+</div>
+
+<!-- ── Tab bar ─────────────────────────────────────────── -->
+<div class="tab-bar">
+  <div class="tab active" data-tab="workflow" onclick="switchTab('workflow')">Workflow</div>
+  <div class="tab" data-tab="structs" onclick="switchTab('structs')">Structs <span id="structCount" class="section-badge" style="margin-left:4px">0</span></div>
+</div>
+
+<!-- ── Main content ──────────────────────────────────── -->
+<div class="main-container" id="mainContainer">
+  <div class="editor-pane" id="editorPane">
+    <!-- Drop zone (shown when no workflow loaded) -->
+    <div id="dropZone" class="drop-zone hidden"
+         ondragover="event.preventDefault(); this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="event.preventDefault(); this.classList.remove('dragover'); loadFile(event.dataTransfer.files[0])"
+         onclick="document.getElementById('fileInput').click()">
+      <h2>Load a workflow</h2>
+      <p>Drop a .yaml file here or click to browse</p>
+    </div>
+
+    <!-- Workflow tab -->
+    <div id="workflowTab"></div>
+
+    <!-- Structs tab -->
+    <div id="structsTab" class="hidden"></div>
+  </div>
+
+  <!-- Help popup (fixed position, rendered once) -->
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal">
+    <div class="help-modal-backdrop" onclick="closeHelpModal()"></div>
+    <div class="help-modal-content">
+      <div class="help-modal-header">
+        <span class="help-modal-title" id="helpModalTitle"></span>
+        <button class="help-modal-close" onclick="closeHelpModal()">&times;</button>
+      </div>
+      <div class="help-modal-body" id="helpModalBody"></div>
+    </div>
+  </div>
+
+  <!-- YAML Preview pane -->
+  <div class="preview-pane hidden" id="previewPane">
+    <div class="preview-header">
+      <span>YAML Preview</span>
+      <button class="btn btn-sm" onclick="copyYAML()">Copy</button>
+    </div>
+    <div class="preview-body" id="previewBody"></div>
+  </div>
+</div>
+
+<script>
+// ── SVG icons ──────────────────────────────────────────
+const chevronSVG = `<svg class="section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>`;
+const stepChevronSVG = `<svg class="step-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>`;
+
+// ── State ──────────────────────────────────────────────
+const state = {
+  workflow: {
+    name: '',
+    version: 1,
+    description: '',
+    params: [],
+    tools: [],
+    gate: { structural: true, semantic: false, human: false, max_step_retries: 3, max_gate_retries: 5 },
+    context: { carry_forward: 'none' },
+    steps: []
+  },
+  structs: [],
+  ui: {
+    activeTab: 'workflow',
+    openSections: new Set(['metadata']),
+    openSteps: new Set(),
+    openStructs: new Set(),
+    yamlPreview: false,
+    dirty: false
+  }
+};
+
+function markDirty() { state.ui.dirty = true; }
+
+// ── Help Text Database ─────────────────────────────────
+const HELP = {
+  'workflow.name': 'Unique workflow identifier in kebab-case (e.g., "my-workflow"). Used as directory name under .agent/workflows/.',
+  'workflow.version': 'Integer version number. Increment when making breaking changes to the workflow definition.',
+  'workflow.description': 'Human-readable description of what this workflow accomplishes. Shown in workflow listings and trace logs.',
+  'context.carry_forward': '"none" = each step starts with clean context (only its own inputs). "summary" = auto-generated summaries from completed steps are injected into subsequent step prompts, giving them awareness of prior work without full conversation history. Per-step override: set carry_forward to ON (force include) or OFF (force exclude) on individual steps.',
+  'gate.structural': 'Validates output files: existence, JSON/YAML parsing, struct schema constraints (types, required fields, patterns, enums). Deterministic, fast (~1s). For subagent: true steps, runs as gate-check.py via the subagentStop hook. For subagent: false (inline) steps, the engine runs the same validation synchronously inside tool_step_complete as a safety net (_validate_step_outputs) — same checks, just no hook. Default: true.',
+  'gate.semantic': 'Run LLM-based quality check after structural gate passes. The orchestrator re-reads the step output and evaluates: completeness (did the subagent address all goal points?), correctness (are outputs consistent with inputs?), coherence (does the output make sense?). Non-deterministic — different runs may judge differently. Adds ~10-30s per step. Default: false.',
+  'gate.human': 'Pause and ask the user for explicit approval before proceeding. The orchestrator presents a summary of the step output and waits for yes/no. Useful for high-stakes steps (e.g., discovery plan approval before expensive parallel scan). Can be set per-step to override workflow default. Default: false.',
+  'gate.max_step_retries': 'Maximum fresh subagent spawns for a single step. When all gate retries within one subagent are exhausted, that subagent is discarded and a NEW one starts with clean context plus failure details from the previous attempt. Default: 3. Total worst-case attempts per step = max_gate_retries x max_step_retries.',
+  'gate.max_gate_retries': 'Maximum in-place retries within a single subagent session. On gate failure, the subagent receives structured feedback (what failed, which schema constraint, the actual value) and self-corrects without losing its conversation context. Default: 5. When exhausted, triggers a step retry (fresh subagent).',
+  'param.name': 'Parameter name, used in goal text and output paths as {name} placeholder. Use snake_case or kebab-case. Note: {run_id} is a built-in synthetic param (auto-generated per run) — do not define a param named run_id.',
+  'param.description': 'Human-readable description shown when the orchestrator prompts for missing parameters at workflow start. Also visible in workflow listings and trace logs.',
+  'param.required': 'If true, the workflow will not start without this parameter. The orchestrator asks the user to provide it. If false, the default value (if set) or null is used.',
+  'param.default': 'Default value used when the parameter is not explicitly provided. Cannot be set together with required: true. String values — use "true"/"false" for boolean-like params (all param values are strings).',
+  'tools': 'Workflow tool dependencies. Two types: "script" = shell command exposed as a normal MCP tool by the stable workflow_tools loader (registered in .mcp.json); "mcp" = external MCP server the workflow requires (user must enable it). Tools are declared at workflow level and optionally restricted per step.',
+  'tool.name': 'Unique tool identifier. Used in step-level tools: filter to restrict which tools a step can use. Must be unique across all tools in the workflow.',
+  'tool.type': '"script" = a shell command exposed as an MCP tool by the workflow_tools loader. The subagent sees it in its inventory as mcp__workflow_tools__<workflow>__<tool> with full description and schema. "mcp" = an external MCP server that must be running. Description comes from the server, not from workflow.yaml.',
+  'tool.command': 'Shell command to execute when the tool is called (script type only). The loader runs this via subprocess. Arguments are passed as --key=value flags. Example: "python .agent/scripts/extract-tables.py"',
+  'tool.description': 'Human-readable description shown to the LLM (script type only). The LLM uses this to decide when to call the tool. For MCP type, description comes from the server automatically.',
+  'tool.input_schema': 'JSON Schema for tool arguments (script type, optional). Defines what arguments the tool accepts, their types, and which are required. Used both as LLM guidance and as input validation by the workflow-tool-validator.py PreToolUse hook in Claude Code.',
+  'tool.required': 'For MCP type: if true (default), workflow blocks at startup when this server is unavailable. The user must enable it before continuing. If false, workflow shows a warning but continues without the tool.',
+  'tool.expected_tools': 'For MCP type (Phase 38, required for Claude Code): list of specific tool names from this server that workflow steps will use. The init-workflow.py script writes these into the per-step subagent\'s tools whitelist as mcp__<server>__<tool>. Without this field, Claude Code subagents will not see any tools from this server (their whitelist would have no MCP entries). Format: ["tool_a", "tool_b"]',
+  'tool.server_config': 'Optional legacy field for inline start config (kept for backward compatibility). In Phase 38 the loader is registered in .mcp.json/.cursor/mcp.json and external MCP servers are managed by the user, so this field is rarely needed. Format: {"command": "python", "args": [".agent/mcp/server.py"]}',
+  'step.tools': 'Restrict which workflow-level tools this step can use. Comma-separated tool names. If empty, the step sees ALL workflow tools. Example: "count_lines, transform_json" — only these two tools are available to this step\'s subagent.',
+  'step.name': 'Unique step identifier within the workflow (kebab-case). Used as key in manifest.json, trace, and for resume targeting. Must be unique across all steps.',
+  'step.goal': 'Detailed instructions for the subagent (or orchestrator if subagent: false). Supports multi-line text. Use {param_name} for parameter placeholders — replaced at runtime with actual values. For conditional steps, start with: IF param is "value": skip this step. The goal is the core prompt that drives the step\'s behavior.',
+  'step.subagent': 'true (default): spawn an isolated subagent with clean context. The subagent only sees its goal, inputs, and summaries. Gate hook fires on completion (via subagentStop). false: execute inline in the orchestrator session. Benefits: no spawn overhead (~5-10s saved), orchestrator retains full conversation context, can make nuanced decisions. Trade-off: no subagentStop hook fires, so no hook-based trace data and no in-place gate retry loop — but structural validation is still run synchronously by the engine inside step_complete (same checks as gate-check.py). Tool-call warnings are also skipped for inline steps because the orchestrator-side MCP calls are not visible in any subagent transcript. Required for delegation steps (delegate_to).',
+  'step.model': 'Optional model hint for the subagent (e.g., "haiku", "sonnet", "opus", or any model ID the adapter supports). The engine forwards this to the orchestrator, which passes it to the adapter. Claude Code: mapped to the Agent tool model parameter. Cursor: may map to Max Mode or be ignored. If empty, the subagent inherits the orchestrator\'s model.',
+  'step.spec_check': 'When true (default), behavioral spec enforcement instructions are appended to the subagent prompt — the subagent checks .agent/specs/ before modifying code. Set to false for non-code steps: planning, scanning, documentation, auditing. Saves prompt tokens and prevents irrelevant spec checks.',
+  'step.carry_forward': 'Override workflow-level carry_forward for this step. ON = include auto-generated summaries from all completed steps (useful for steps that need broad context). OFF = no summaries, subagent works only with its declared inputs (useful for focused, isolated tasks). Inherit (default) = use the workflow-level setting.',
+  'step.param_bindings': 'Re-bind workflow params from step outputs after gate passes. Syntax: "param_name: data/output.json::field.path". Supports dot notation for nested JSON fields (e.g., "lead: data/plan.json::metadata.reviewer"). Runs only after successful gate validation. Useful for passing discovered values to subsequent steps.',
+  'step.parallel': 'Enable parallel fan-out: spawn one subagent per matching item in the parallel_key array. All subagents run concurrently and must complete before the step is marked done. Each subagent receives the same goal but operates on its assigned item (e.g., one domain per subagent).',
+  'step.parallel_key': 'JSONPath-like expression pointing to an array in a previous step\'s output. E.g., "discovery-plan.domains[status=pending]". Each matching item spawns a separate subagent. Filter syntax: [field=value] selects only items where field equals value.',
+  'step.delegate_to': 'Name of another predefined workflow to invoke as a sub-workflow. The orchestrator loads the delegated workflow and executes it with its own manifest and trace. Only one level of delegation is allowed (no recursive delegation). The step MUST have subagent: false — delegation is always orchestrator-driven.',
+  'step.delegate_params': 'Parameters to pass to the delegated workflow. Supports {param} placeholders from the parent workflow. E.g., "source: {source_doc}" passes the parent\'s source_doc param as the delegated workflow\'s source param.',
+  'input.path': 'File path for subagent input. Supports {param} placeholders (e.g., "data/{run_id}-plan.json") and glob patterns (e.g., ".agent/specs/{domain}/*.md"). Paths are relative to the project root.',
+  'input.inject': '"file" = orchestrator reads the file and injects full content into the subagent prompt. Best for small-medium files the subagent needs immediately. "file_if_exists" = same as file, but silently skipped if the file does not exist (no error). Useful for optional inputs like verified results. "reference" = only the path is mentioned in the prompt; subagent reads it via tools if needed. Best for large files or files the subagent may not need.',
+  'input.struct': 'Struct schema name for pre-step input validation. The structural gate validates this input before the subagent starts. Ensures the input from a previous step is well-formed.',
+  'output.path': 'Expected output file path written by the subagent. Supports {param} placeholders (e.g., "data/{run_id}-report.json") and glob patterns. The structural gate checks this file exists and validates against the struct schema if specified.',
+  'output.struct': 'Struct schema name for post-step gate validation. After the subagent completes, gate-check.py validates the output file against this schema (types, required fields, patterns). Only applies when gate.structural is true and subagent is true (hook must fire).',
+  'struct.name': 'Schema name referenced by workflow step inputs/outputs (e.g., "extraction-manifest"). Must match exactly.',
+  'struct.description': 'Human-readable description of what this schema validates.',
+  'struct.format': 'Expected file format: "json", "yaml", "markdown", or "text". Determines which validation sections are available.',
+  'struct.field': 'Dot-notation path to a field in the output. Use [] for array items: "tasks[].domain" means every item in the tasks array must have a domain field.',
+  'struct.field_type': 'Expected type: string, number, boolean, array, or object.',
+  'struct.pattern': 'Regular expression pattern the string field must match (e.g., "^[A-Z]+-\\d{3}$").',
+  'struct.enum': 'Comma-separated list of allowed values for this field.',
+  'struct.min_items': 'Minimum number of items required in an array field.',
+  'struct.fm_field': 'Field name expected in the YAML frontmatter of a Markdown file.',
+  'struct.fm_type': 'Frontmatter field type: string, number, enum, list, or boolean.',
+  'struct.fm_values': 'Comma-separated allowed values for enum-type frontmatter fields.',
+  'struct.required_sections': 'Required Markdown ## heading names. One per line.',
+  'struct.file_exists': 'Require the output file to exist (default: true).',
+  'struct.min_size': 'Minimum file size in bytes.',
+  'struct.max_size': 'Maximum file size in bytes.',
+  'struct.name_pattern': 'Regular expression the output filename must match.',
+};
+
+function helpBtn(key) {
+  const text = HELP[key] || '';
+  if (!text) return '';
+  return `<span class="help-btn" data-help="${esc(key)}" onclick="event.stopPropagation(); showHelp(this, '${key}')">?</span>`;
+}
+
+// ── Help Modal System ──────────────────────────────────
+function showHelp(btn, key) {
+  event && event.stopPropagation();
+  const text = HELP[key] || '';
+  if (!text) return;
+  const title = key.replace(/\./g, ' › ').replace(/_/g, ' ');
+  document.getElementById('helpModalTitle').textContent = title;
+  let html = `<div class="help-text">${esc(text)}</div>`;
+  if (HELP_DIAGRAMS[key]) html += `<div class="help-diagram">${HELP_DIAGRAMS[key]()}</div>`;
+  document.getElementById('helpModalBody').innerHTML = html;
+  document.getElementById('helpModal').classList.add('visible');
+}
+function closeHelpModal() {
+  document.getElementById('helpModal').classList.remove('visible');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHelpModal(); });
+
+// ── SVG Diagram Arrow Defs ────────────────────────────
+const svgDefs = `<defs>
+  <marker id="arrowHead" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+    <polygon points="0 0, 10 3.5, 0 7" fill="var(--text-muted)"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+    <polygon points="0 0, 10 3.5, 0 7" fill="var(--green)"/>
+  </marker>
+  <marker id="arrowRed" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+    <polygon points="0 0, 10 3.5, 0 7" fill="var(--red)"/>
+  </marker>
+</defs>`;
+
+function svgNode(x, y, w, h, cls, label, labelCls='lbl') {
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="node ${cls}"/>` +
+         `<text x="${x+w/2}" y="${y+h/2}" class="${labelCls}">${label}</text>`;
+}
+
+// ── Diagram: Gate Flow ────────────────────────────────
+function svgGateFlow(highlight) {
+  // horizontal pipeline: Step Done → Structural → Semantic → Human → Pass / Retry
+  const W=470, H=120;
+  const bw=80, bh=32, gap=14, y1=20, y2=y1+bh/2;
+  const stages = [
+    { x:0,   label:'Step Done', cls:'node-muted', key:null },
+    { x:94,  label:'Structural', cls:'node-blue', key:'structural' },
+    { x:188, label:'Semantic',   cls:'node-purple', key:'semantic' },
+    { x:282, label:'Human',      cls:'node-amber', key:'human' },
+  ];
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svgDefs}`;
+  stages.forEach((st, i) => {
+    const highlighted = highlight === 'all' || highlight === st.key;
+    const opacity = highlighted || st.key === null ? 1 : 0.35;
+    s += `<g style="opacity:${opacity}">`;
+    s += svgNode(st.x, y1, bw, bh, st.cls, st.label);
+    if (i < stages.length - 1) {
+      s += `<line x1="${st.x+bw}" y1="${y2}" x2="${stages[i+1].x}" y2="${y2}" class="arrow"/>`;
+    }
+    s += `</g>`;
+  });
+  // Pass / Fail branches
+  const lastX = 282 + bw;
+  // Pass arrow → green box
+  s += `<line x1="${lastX}" y1="${y2}" x2="${lastX+20}" y2="${y2}" class="arrow-green"/>`;
+  s += svgNode(lastX+20, y1, 70, bh, 'node-green', '✓ Pass', 'lbl lbl-green');
+  // Fail arrow → red box (below)
+  const fy = y1 + bh + 20;
+  s += `<line x1="${lastX-bw/2}" y1="${y1+bh}" x2="${lastX-bw/2}" y2="${fy}" class="arrow-red"/>`;
+  s += svgNode(lastX-bw-10, fy, 90, bh, 'node-red', '✗ Retry', 'lbl lbl-red');
+  // Label: retries
+  s += `<text x="${lastX-bw/2+50}" y="${fy+bh/2}" class="lbl lbl-sm" text-anchor="start"> gate retries</text>`;
+  s += `</svg>`;
+  return s;
+}
+
+// ── Diagram: Retry Flow ───────────────────────────────
+function svgRetryFlow(type) {
+  const chip = (label, bg, color, border) =>
+    `<span style="padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;background:${bg};color:${color};border:1.5px solid ${border};white-space:nowrap">${label}</span>`;
+  const arrow = (color) =>
+    `<span style="color:${color};font-size:12px;margin:0 2px">&#8594;</span>`;
+  const note = (text) =>
+    `<span style="font-size:10px;color:var(--text-muted);font-style:italic">${text}</span>`;
+
+  if (type === 'gate') {
+    return `<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        ${chip('Gate Fail','var(--red-bg)','var(--red)','var(--red)')}
+        ${arrow('var(--text-muted)')}
+        ${chip('retries &lt; max?','var(--accent-light)','var(--accent)','var(--accent)')}
+      </div>
+      <div style="padding-left:20px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="color:var(--green);font-size:11px;font-weight:600">YES</span>
+          ${arrow('var(--green)')}
+          ${chip('Same Agent','var(--green-bg)','var(--green)','var(--green)')}
+          ${note('receives feedback, self-corrects in place')}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="color:var(--red);font-size:11px;font-weight:600;padding-right:3px">NO</span>
+          ${arrow('var(--red)')}
+          ${chip('Step Retry','var(--amber-bg)','var(--amber)','var(--amber)')}
+          ${note('new subagent spawned with failure context')}
+        </div>
+      </div>
+    </div>`;
+  } else {
+    return `<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        ${chip('Gate Max','var(--amber-bg)','var(--amber)','var(--amber)')}
+        ${arrow('var(--text-muted)')}
+        ${chip('step retries &lt; max?','var(--accent-light)','var(--accent)','var(--accent)')}
+      </div>
+      <div style="padding-left:20px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="color:var(--green);font-size:11px;font-weight:600">YES</span>
+          ${arrow('var(--green)')}
+          ${chip('New Subagent','var(--green-bg)','var(--green)','var(--green)')}
+          ${note('clean context + failure details injected')}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="color:var(--red);font-size:11px;font-weight:600;padding-right:3px">NO</span>
+          ${arrow('var(--red)')}
+          ${chip('Step Failed','var(--red-bg)','var(--red)','var(--red)')}
+          ${note('workflow pauses, human intervention needed')}
+        </div>
+      </div>
+    </div>`;
+  }
+}
+
+// ── Diagram: Param Bindings ───────────────────────────
+function svgParamBindings() {
+  const W=470, H=110;
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svgDefs}`;
+  // Step output → :: selector → manifest.params → {placeholder}
+  s += svgNode(0, 15, 90, 30, 'node-purple', 'output.json', 'lbl lbl-purple');
+  s += `<line x1="90" y1="30" x2="115" y2="30" class="arrow"/>`;
+  s += svgNode(115, 15, 75, 30, 'node-accent', '::field');
+  s += `<line x1="190" y1="30" x2="215" y2="30" class="arrow"/>`;
+  s += svgNode(215, 15, 120, 30, 'node-blue', 'manifest.params', 'lbl lbl-blue');
+  s += `<line x1="335" y1="30" x2="360" y2="30" class="arrow-green"/>`;
+  s += svgNode(360, 15, 100, 30, 'node-green', '{placeholder}', 'lbl lbl-green');
+  // Annotation below
+  s += `<text x="45" y="62" class="lbl lbl-sm">step writes</text>`;
+  s += `<text x="152" y="62" class="lbl lbl-sm">extract</text>`;
+  s += `<text x="275" y="62" class="lbl lbl-sm">orchestrator</text>`;
+  s += `<text x="275" y="75" class="lbl lbl-sm">updates param</text>`;
+  s += `<text x="410" y="62" class="lbl lbl-sm">next step</text>`;
+  s += `<text x="410" y="75" class="lbl lbl-sm">receives value</text>`;
+  // Example
+  s += `<text x="0" y="100" class="lbl lbl-sm" text-anchor="start" style="font-family:var(--mono)">reviewer: "data/analysis.json::lead_reviewer"</text>`;
+  s += `</svg>`;
+  return s;
+}
+
+// ── Diagram: Carry Forward ────────────────────────────
+function svgCarryForward() {
+  // Use HTML layout instead of SVG to avoid clipping issues
+  return `<div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">none</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="padding:4px 14px;border-radius:6px;font-size:11px;font-weight:500;background:var(--bg-section);color:var(--text-muted);border:1.5px solid var(--border)">Step 1</span>
+        <span style="color:var(--red);font-size:10px">- - &#10007; - -</span>
+        <span style="padding:4px 14px;border-radius:6px;font-size:11px;font-weight:500;background:var(--bg-section);color:var(--text-muted);border:1.5px solid var(--border)">Step 2</span>
+        <span style="color:var(--red);font-size:10px">- - &#10007; - -</span>
+        <span style="padding:4px 14px;border-radius:6px;font-size:11px;font-weight:500;background:var(--bg-section);color:var(--text-muted);border:1.5px solid var(--border)">Step 3</span>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:2px">Each step starts clean — no prior context</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">summary</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="padding:4px 14px;border-radius:6px;font-size:11px;font-weight:500;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue)">Step 1</span>
+        <span style="color:var(--text-muted);font-size:10px">&#8594; &#931; &#8594;</span>
+        <span style="padding:4px 14px;border-radius:6px;font-size:11px;font-weight:500;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue)">Step 2</span>
+        <span style="color:var(--text-muted);font-size:10px">&#8594; &#931; &#8594;</span>
+        <span style="padding:4px 14px;border-radius:6px;font-size:11px;font-weight:500;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue)">Step 3</span>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:2px">Auto-generated summaries from prior steps are injected</div>
+    </div>
+  </div>`;
+}
+
+// ── Diagram: Input Inject Modes ───────────────────────
+function svgInputFlow() {
+  // Use HTML table-like layout instead of pure SVG to avoid overlap
+  return `<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="display:inline-block;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;background:var(--green-bg);color:var(--green);border:1.5px solid var(--green);min-width:110px;text-align:center">file</span>
+      <span style="font-size:12px;color:var(--text-secondary)">Full content injected into prompt</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="display:inline-block;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue);min-width:110px;text-align:center">file_if_exists</span>
+      <span style="font-size:12px;color:var(--text-secondary)">Injected if exists, else silently skipped</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="display:inline-block;padding:4px 14px;border-radius:6px;font-size:12px;font-weight:600;background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber);min-width:110px;text-align:center">reference</span>
+      <span style="font-size:12px;color:var(--text-secondary)">Only path mentioned; agent reads via tools</span>
+    </div>
+  </div>`;
+}
+
+// ── Diagram: Output + Gate Validation ─────────────────
+function svgOutputFlow() {
+  const W=470, H=90;
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svgDefs}`;
+  // Step writes → file → struct gate validates → next step reads
+  s += svgNode(0, 10, 90, 30, 'node-accent', 'Subagent');
+  s += `<text x="45" y="52" class="lbl lbl-sm">writes file</text>`;
+  s += `<line x1="90" y1="25" x2="120" y2="25" class="arrow"/>`;
+  s += svgNode(120, 10, 90, 30, 'node-purple', 'output.json', 'lbl lbl-purple');
+  s += `<line x1="210" y1="25" x2="240" y2="25" class="arrow"/>`;
+  s += svgNode(240, 10, 100, 30, 'node-blue', 'Struct Gate', 'lbl lbl-blue');
+  s += `<text x="290" y="52" class="lbl lbl-sm">validates schema</text>`;
+  s += `<line x1="340" y1="25" x2="370" y2="25" class="arrow-green"/>`;
+  s += svgNode(370, 10, 90, 30, 'node-green', 'Next Step', 'lbl lbl-green');
+  s += `<text x="415" y="52" class="lbl lbl-sm">reads as input</text>`;
+  s += `</svg>`;
+  return s;
+}
+
+// ── Diagram: Params Flow ──────────────────────────────
+function svgParamsFlow() {
+  const W=470, H=90;
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svgDefs}`;
+  s += svgNode(0, 10, 100, 30, 'node-accent', 'User starts');
+  s += `<line x1="100" y1="25" x2="130" y2="25" class="arrow"/>`;
+  s += svgNode(130, 10, 100, 30, 'node-blue', 'params filled', 'lbl lbl-blue');
+  s += `<line x1="230" y1="25" x2="260" y2="25" class="arrow"/>`;
+  s += svgNode(260, 10, 100, 30, 'node-purple', '{placeholder}', 'lbl lbl-purple');
+  s += `<text x="310" y="52" class="lbl lbl-sm">replaced in goals,</text>`;
+  s += `<text x="310" y="66" class="lbl lbl-sm">paths, delegate_params</text>`;
+  s += `<line x1="360" y1="25" x2="390" y2="25" class="arrow-green"/>`;
+  s += svgNode(390, 10, 70, 30, 'node-green', 'Step 1', 'lbl lbl-green');
+  s += `</svg>`;
+  return s;
+}
+
+// ── Diagram: Subagent Isolation ───────────────────────
+function svgSubagent() {
+  const W=470, H=100;
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svgDefs}`;
+  // Orchestrator spawns isolated subagent
+  s += svgNode(0, 15, 100, 30, 'node-accent', 'Orchestrator');
+  s += `<line x1="100" y1="30" x2="140" y2="30" class="arrow"/>`;
+  s += `<text x="120" y="18" class="lbl lbl-sm">spawns</text>`;
+  // Subagent box (larger, represents isolation)
+  s += `<rect x="140" y="5" width="180" height="55" rx="8" ry="8" fill="none" stroke="var(--border)" stroke-dasharray="5,3"/>`;
+  s += `<text x="230" y="17" class="lbl lbl-sm" style="font-style:italic">isolated context</text>`;
+  s += svgNode(155, 25, 80, 26, 'node-green', 'Subagent', 'lbl lbl-green');
+  s += svgNode(245, 25, 60, 26, 'node-purple', 'tools', 'lbl lbl-purple');
+  s += `<line x1="320" y1="30" x2="360" y2="30" class="arrow-green"/>`;
+  s += svgNode(360, 15, 90, 30, 'node-blue', 'outputs', 'lbl lbl-blue');
+  s += `<text x="200" y="78" class="lbl lbl-sm">subagent: true → clean session, no prior context leaks</text>`;
+  s += `<text x="200" y="92" class="lbl lbl-sm">subagent: false → runs inline in orchestrator (shares context)</text>`;
+  s += `</svg>`;
+  return s;
+}
+
+// ── Help Diagrams Map ─────────────────────────────────
+const HELP_DIAGRAMS = {
+  'gate.structural':      () => svgGateFlow('structural'),
+  'gate.semantic':         () => svgGateFlow('semantic'),
+  'gate.human':            () => svgGateFlow('human'),
+  'gate.max_step_retries': () => svgRetryFlow('step'),
+  'gate.max_gate_retries': () => svgRetryFlow('gate'),
+  'step.param_bindings':   () => svgParamBindings(),
+  'step.carry_forward':    () => svgCarryForward(),
+  'context.carry_forward': () => svgCarryForward(),
+  'input.inject':          () => svgInputFlow(),
+  'output.struct':         () => svgOutputFlow(),
+  'input.struct':          () => svgOutputFlow(),
+  'output.path':           () => svgOutputFlow(),
+  'workflow.params':       () => svgParamsFlow(),
+  'step.subagent':         () => svgSubagent(),
+  'step.spec_check':       () => svgGateFlow('all'),
+};
+
+// ── Toast ─────────────────────────────────────────────
+function showToast(msg, ms=2000) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; }, ms - 300);
+  setTimeout(() => el.remove(), ms);
+}
+
+// ── Example Workflow ──────────────────────────────────
+const EXAMPLE_WORKFLOW_YAML = `name: code-review-pipeline
+version: 1
+description: >
+  Automated code review pipeline. Analyzes a repository branch,
+  discovers the best reviewer, runs structured review, and generates
+  a summary report.
+
+params:
+  - name: repo_path
+    description: >
+      Path to the repository root.
+    required: true
+  - name: branch
+    description: >
+      Branch to review. Defaults to main.
+    required: false
+    default: main
+  - name: reviewer
+    description: >
+      Reviewer name (auto-discovered by analyze step if not provided).
+    required: false
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+
+steps:
+  - name: analyze
+    goal: >
+      Scan {repo_path} on branch {branch}. Identify changed files,
+      complexity hotspots, and the best reviewer from git blame.
+      Write findings to the analysis output.
+    subagent: true
+    spec_check: false
+    inputs:
+      - path: "{repo_path}/README.md"
+        inject: file_if_exists
+      - path: "{repo_path}/CONTRIBUTING.md"
+        inject: reference
+    outputs:
+      - path: data/analysis.json
+        struct: analysis-result
+    param_bindings:
+      reviewer: "data/analysis.json::lead_reviewer"
+
+  - name: review
+    goal: >
+      Perform a thorough code review of {branch} in {repo_path}.
+      Reviewer: {reviewer}. Check for bugs, security issues,
+      style violations, and missing tests.
+    subagent: true
+    spec_check: true
+    carry_forward: true
+    gate:
+      human: true
+      max_step_retries: 1
+    inputs:
+      - path: data/analysis.json
+        inject: file
+        struct: analysis-result
+    outputs:
+      - path: data/review-report.json
+        struct: review-report
+
+  - name: report
+    goal: >
+      Generate a human-readable summary report from the review.
+      Include stats, top issues, and recommendations.
+    subagent: true
+    spec_check: true
+    parallel: false
+    inputs:
+      - path: data/review-report.json
+        inject: file
+    outputs:
+      - path: data/summary.md
+`;
+
+const EXAMPLE_STRUCTS = [
+  {
+    name: 'analysis-result',
+    description: 'Output of the analyze step — changed files, complexity, reviewer.',
+    format: 'json',
+    fields: [
+      { path: 'lead_reviewer', type: 'string', required: true, description: 'Git blame top contributor' },
+      { path: 'changed_files', type: 'array', required: true, min_items: 1, description: 'List of changed file paths' },
+      { path: 'changed_files[].path', type: 'string', required: true },
+      { path: 'changed_files[].complexity', type: 'string', required: false, enum: 'low,medium,high' },
+      { path: 'total_lines_changed', type: 'number', required: false },
+    ],
+    markdown: null
+  },
+  {
+    name: 'review-report',
+    description: 'Structured review findings with severity levels.',
+    format: 'json',
+    fields: [
+      { path: 'reviewer', type: 'string', required: true },
+      { path: 'branch', type: 'string', required: true },
+      { path: 'issues', type: 'array', required: true, min_items: 0, description: 'Found issues' },
+      { path: 'issues[].file', type: 'string', required: true },
+      { path: 'issues[].severity', type: 'string', required: true, enum: 'critical,major,minor,info' },
+      { path: 'issues[].description', type: 'string', required: true },
+      { path: 'passed', type: 'boolean', required: true, description: 'Overall pass/fail' },
+    ],
+    markdown: null
+  }
+];
+
+function loadExample() {
+  if (state.ui.dirty && !confirm('This will replace your current workflow. Continue?')) return;
+  const parsed = parseYAML(EXAMPLE_WORKFLOW_YAML);
+  loadWorkflowFromParsed(parsed);
+  // Load pre-built structs instead of auto-detect
+  state.structs = JSON.parse(JSON.stringify(EXAMPLE_STRUCTS));
+  // Open key sections for visibility
+  state.ui.openSections = new Set(['metadata', 'params', 'gate']);
+  state.ui.openSteps = new Set([0, 1]);
+  state.ui.openStructs = new Set([0, 1]);
+  state.ui.activeTab = 'workflow';
+  renderWorkflowTab();
+  renderStructsTab();
+  switchTab('workflow');
+  showToast('Example workflow loaded — explore all features!');
+}
+
+// ── Utilities ──────────────────────────────────────────
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s == null ? '' : s);
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function toggleTheme() {
+  const d = document.documentElement;
+  const dark = d.getAttribute('data-theme') === 'dark';
+  d.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('btnTheme').textContent = dark ? 'Dark' : 'Light';
+}
+
+function switchTab(tab) {
+  state.ui.activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('workflowTab').classList.toggle('hidden', tab !== 'workflow');
+  document.getElementById('structsTab').classList.toggle('hidden', tab !== 'structs');
+}
+
+function togglePreview() {
+  state.ui.yamlPreview = !state.ui.yamlPreview;
+  const mc = document.getElementById('mainContainer');
+  const pp = document.getElementById('previewPane');
+  const btn = document.getElementById('btnPreview');
+  mc.classList.toggle('with-preview', state.ui.yamlPreview);
+  pp.classList.toggle('hidden', !state.ui.yamlPreview);
+  btn.textContent = state.ui.yamlPreview ? 'Hide Preview' : 'Preview';
+  if (state.ui.yamlPreview) renderPreview();
+}
+
+function structNames() {
+  return state.structs.map(s => s.name).filter(Boolean);
+}
+
+function structDropdown(selected, onchangeExpr) {
+  const names = structNames();
+  let opts = `<option value="">-- none --</option>`;
+  names.forEach(n => { opts += `<option value="${esc(n)}"${n === selected ? ' selected' : ''}>${esc(n)}</option>`; });
+  opts += `<option value="__new__">+ Create new...</option>`;
+  return `<select class="field-select" onchange="${onchangeExpr}" style="max-width:180px">${opts}</select>`;
+}
+
+// ── Validation ─────────────────────────────────────────
+const V = {
+  kebab: v => /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(v),
+  posInt: v => Number.isInteger(Number(v)) && Number(v) > 0,
+  required: v => v != null && String(v).trim().length > 0,
+  uniqueStep: (name, steps, idx) => !steps.some((s, i) => i !== idx && s.name === name),
+};
+
+function validateWorkflow() {
+  const w = state.workflow;
+  const errors = [];
+  if (!V.required(w.name)) errors.push('Workflow name is required');
+  else if (!V.kebab(w.name)) errors.push('Workflow name must be kebab-case (e.g., "my-workflow")');
+  if (!V.posInt(w.version)) errors.push('Version must be a positive integer');
+  if (!V.required(w.description)) errors.push('Description is required');
+  if (w.steps.length === 0) errors.push('At least one step is required');
+  w.steps.forEach((s, i) => {
+    if (!V.required(s.name)) errors.push(`Step ${i + 1}: name is required`);
+    else if (!V.kebab(s.name)) errors.push(`Step ${i + 1} "${s.name}": name must be kebab-case`);
+    else if (!V.uniqueStep(s.name, w.steps, i)) errors.push(`Step ${i + 1} "${s.name}": duplicate step name`);
+    if (!V.required(s.goal) && !V.required(s.delegate_to)) errors.push(`Step ${i + 1}: goal is required (or use delegate_to)`);
+    if (s.parallel && !V.required(s.parallel_key)) errors.push(`Step ${i + 1} "${s.name}": parallel_key is required when parallel is enabled`);
+  });
+  return errors;
+}
+
+// ── YAML Generator ─────────────────────────────────────
+function yamlStr(s) {
+  if (s == null || s === '') return "''";
+  s = String(s);
+  if (s === 'true' || s === 'false' || s === 'null' || /^\d+$/.test(s)) return `"${s}"`;
+  if (/[:{}\[\],&*?|>!%#@`"'\n]/.test(s) || s.startsWith(' ') || s.endsWith(' ')) {
+    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  }
+  return s;
+}
+
+function yamlBlock(s, indent) {
+  const pad = ' '.repeat(indent);
+  const lines = String(s).split('\n');
+  return '>\n' + lines.map(l => pad + l).join('\n');
+}
+
+function jsonToYaml(obj, indent) {
+  const pad = ' '.repeat(indent);
+  let out = '';
+  if (Array.isArray(obj)) {
+    obj.forEach(item => {
+      if (typeof item === 'object' && item !== null) {
+        out += pad + '- ';
+        const entries = Object.entries(item);
+        entries.forEach(([k, v], idx) => {
+          const prefix = idx === 0 ? '' : pad + '  ';
+          if (typeof v === 'object' && v !== null) {
+            out += prefix + k + ':\n' + jsonToYaml(v, indent + 4);
+          } else {
+            out += prefix + k + ': ' + JSON.stringify(v) + '\n';
+          }
+        });
+      } else {
+        out += pad + '- ' + JSON.stringify(item) + '\n';
+      }
+    });
+  } else if (typeof obj === 'object' && obj !== null) {
+    Object.entries(obj).forEach(([k, v]) => {
+      if (typeof v === 'object' && v !== null) {
+        out += pad + k + ':\n' + jsonToYaml(v, indent + 2);
+      } else {
+        out += pad + k + ': ' + JSON.stringify(v) + '\n';
+      }
+    });
+  }
+  return out;
+}
+
+function generateWorkflowYAML(w) {
+  let y = '';
+  y += `name: ${yamlStr(w.name)}\n`;
+  y += `version: ${w.version}\n`;
+  if (w.description.includes('\n')) {
+    y += `description: ${yamlBlock(w.description, 2)}\n`;
+  } else {
+    y += `description: ${yamlStr(w.description)}\n`;
+  }
+  y += '\n';
+
+  // params
+  if (w.params.length > 0) {
+    y += 'params:\n';
+    w.params.forEach(p => {
+      y += `  - name: ${yamlStr(p.name)}\n`;
+      y += `    description: ${yamlStr(p.description)}\n`;
+      if (p.required) y += `    required: true\n`;
+      if (p.default && !p.required) y += `    default: ${yamlStr(p.default)}\n`;
+    });
+    y += '\n';
+  }
+
+  // tools
+  if (w.tools.length > 0) {
+    y += 'tools:\n';
+    w.tools.forEach(t => {
+      y += `  - name: ${yamlStr(t.name)}\n`;
+      y += `    type: ${t.type}\n`;
+      if (t.type === 'script') {
+        y += `    command: ${yamlStr(t.command)}\n`;
+        y += `    description: ${yamlStr(t.description)}\n`;
+        if (t.input_schema) {
+          try {
+            const schema = JSON.parse(t.input_schema);
+            y += '    input_schema:\n';
+            y += jsonToYaml(schema, 6);
+          } catch(e) {}
+        }
+      } else if (t.type === 'mcp') {
+        y += `    required: ${t.required}\n`;
+        // Phase 38: expected_tools for per-step subagent whitelist generation
+        if (t.expected_tools && t.expected_tools.trim()) {
+          const items = t.expected_tools.split(',').map(s => s.trim()).filter(Boolean);
+          if (items.length > 0) {
+            y += '    expected_tools:\n';
+            items.forEach(item => {
+              y += `      - ${yamlStr(item)}\n`;
+            });
+          }
+        }
+        if (t.server_config) {
+          try {
+            const cfg = JSON.parse(t.server_config);
+            y += '    server_config:\n';
+            y += jsonToYaml(cfg, 6);
+          } catch(e) {}
+        }
+      }
+    });
+    y += '\n';
+  }
+
+  // gate
+  y += 'gate:\n';
+  y += `  structural: ${w.gate.structural}\n`;
+  y += `  semantic: ${w.gate.semantic}\n`;
+  y += `  human: ${w.gate.human}\n`;
+  y += `  max_gate_retries: ${w.gate.max_gate_retries}\n`;
+  y += `  max_step_retries: ${w.gate.max_step_retries}\n`;
+  y += '\n';
+
+  // context
+  if (w.context.carry_forward !== 'none') {
+    y += 'context:\n';
+    y += `  carry_forward: ${w.context.carry_forward}\n`;
+    y += '\n';
+  }
+
+  // steps
+  y += 'steps:\n';
+  w.steps.forEach(s => {
+    y += `  - name: ${yamlStr(s.name)}\n`;
+    y += `    spec_check: ${s.spec_check}\n`;
+    y += `    subagent: ${s.subagent}\n`;
+
+    if (s.goal) {
+      if (s.goal.includes('\n')) {
+        y += `    goal: ${yamlBlock(s.goal, 6)}\n`;
+      } else {
+        y += `    goal: ${yamlStr(s.goal)}\n`;
+      }
+    }
+
+    if (s.model) {
+      y += `    model: ${yamlStr(s.model)}\n`;
+    }
+
+    if (s.tools) {
+      const toolList = s.tools.split(',').map(t => t.trim()).filter(Boolean);
+      if (toolList.length > 0) {
+        y += `    tools: [${toolList.join(', ')}]\n`;
+      }
+    }
+
+    if (s.carry_forward != null) {
+      y += `    carry_forward: ${s.carry_forward}\n`;
+    }
+
+    if (s.parallel) {
+      y += `    parallel: true\n`;
+      if (s.parallel_key) y += `    parallel_key: ${yamlStr(s.parallel_key)}\n`;
+    }
+
+    if (s.delegate_to) {
+      y += `    delegate_to: ${yamlStr(s.delegate_to)}\n`;
+      if (s.delegate_params && Object.keys(s.delegate_params).length > 0) {
+        y += `    params:\n`;
+        Object.entries(s.delegate_params).forEach(([k, v]) => {
+          y += `      ${k}: ${yamlStr(v)}\n`;
+        });
+      }
+    }
+
+    if (s.inputs && s.inputs.length > 0) {
+      y += '    inputs:\n';
+      s.inputs.forEach(inp => {
+        y += `      - path: ${yamlStr(inp.path)}\n`;
+        y += `        inject: ${inp.inject}\n`;
+        if (inp.struct) y += `        struct: ${yamlStr(inp.struct)}\n`;
+      });
+    }
+
+    if (s.outputs && s.outputs.length > 0) {
+      y += '    outputs:\n';
+      s.outputs.forEach(out => {
+        y += `      - path: ${yamlStr(out.path)}\n`;
+        if (out.struct) y += `        struct: ${yamlStr(out.struct)}\n`;
+      });
+    }
+
+    if (s.param_bindings && Object.keys(s.param_bindings).length > 0) {
+      y += '    param_bindings:\n';
+      Object.entries(s.param_bindings).forEach(([k, v]) => {
+        y += `      ${k}: ${yamlStr(v)}\n`;
+      });
+    }
+
+    if (s.gate) {
+      const g = s.gate;
+      const parts = [];
+      if (g.structural != null) parts.push(`structural: ${g.structural}`);
+      if (g.semantic != null) parts.push(`semantic: ${g.semantic}`);
+      if (g.human != null) parts.push(`human: ${g.human}`);
+      if (g.max_step_retries != null) parts.push(`max_step_retries: ${g.max_step_retries}`);
+      if (g.max_gate_retries != null) parts.push(`max_gate_retries: ${g.max_gate_retries}`);
+      if (parts.length > 0) {
+        y += '    gate:\n';
+        parts.forEach(p => { y += `      ${p}\n`; });
+      }
+    }
+  });
+
+  return y;
+}
+
+function generateStructYAML(s) {
+  let y = '';
+  y += `name: ${yamlStr(s.name)}\n`;
+  y += `description: ${yamlStr(s.description)}\n`;
+  y += `format: ${s.format}\n`;
+
+  // json_schema / yaml_schema
+  const schemaKey = s.format === 'yaml' ? 'yaml_schema' : 'json_schema';
+  if ((s.format === 'json' || s.format === 'yaml') && s.required_fields && s.required_fields.length > 0) {
+    y += `${schemaKey}:\n`;
+    y += `  required_fields:\n`;
+    s.required_fields.forEach(f => {
+      y += `    - field: ${yamlStr(f.field)}\n`;
+      y += `      type: ${f.type}\n`;
+      if (f.pattern) y += `      pattern: ${yamlStr(f.pattern)}\n`;
+      if (f.enum_values) y += `      enum: [${f.enum_values.split(',').map(v => yamlStr(v.trim())).join(', ')}]\n`;
+      if (f.min_items != null && f.min_items !== '') y += `      min_items: ${f.min_items}\n`;
+    });
+  }
+
+  // frontmatter
+  if (s.format === 'markdown') {
+    if (s.frontmatter && s.frontmatter.length > 0) {
+      y += 'frontmatter:\n';
+      y += '  required:\n';
+      s.frontmatter.forEach(f => {
+        y += `    - field: ${yamlStr(f.field)}\n`;
+        y += `      type: ${f.type}\n`;
+        if (f.pattern) y += `      pattern: ${yamlStr(f.pattern)}\n`;
+        if (f.values) y += `      values: [${f.values.split(',').map(v => yamlStr(v.trim())).join(', ')}]\n`;
+      });
+    }
+    if (s.required_sections && s.required_sections.length > 0) {
+      y += 'required_sections:\n';
+      s.required_sections.forEach(sec => {
+        y += `  - ${yamlStr(sec)}\n`;
+      });
+    }
+  }
+
+  // file_checks
+  if (s.file_checks) {
+    const fc = s.file_checks;
+    const parts = [];
+    if (fc.exists === false) parts.push('exists: false');
+    if (fc.min_size) parts.push(`min_size: ${fc.min_size}`);
+    if (fc.max_size) parts.push(`max_size: ${fc.max_size}`);
+    if (fc.name_pattern) parts.push(`name_pattern: ${yamlStr(fc.name_pattern)}`);
+    if (parts.length > 0) {
+      y += 'file_checks:\n';
+      parts.forEach(p => { y += `  ${p}\n`; });
+    }
+  }
+
+  return y;
+}
+
+// ── YAML Parser (minimal, for our subset) ──────────────
+function parseYAML(text) {
+  const lines = text.split('\n');
+  const root = {};
+  const stack = [{ obj: root, indent: -1, type: 'map' }];
+  let i = 0;
+
+  function currentIndent(line) {
+    const m = line.match(/^(\s*)/);
+    return m ? m[1].length : 0;
+  }
+
+  function parseValue(raw) {
+    raw = raw.trim();
+    if (raw === '' || raw === 'null' || raw === '~') return null;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    if (/^-?\d+$/.test(raw)) return parseInt(raw, 10);
+    if (/^-?\d+\.\d+$/.test(raw)) return parseFloat(raw);
+    // Quoted strings
+    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+      return raw.slice(1, -1).replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    }
+    // Inline array [a, b, c]
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      return raw.slice(1, -1).split(',').map(v => parseValue(v.trim()));
+    }
+    return raw;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) { i++; continue; }
+
+    const ind = currentIndent(line);
+
+    // Pop stack to find correct parent
+    while (stack.length > 1 && ind <= stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1];
+
+    // List item
+    if (trimmed.startsWith('- ')) {
+      const content = trimmed.slice(2).trim();
+      const keyMatch = content.match(/^(\w[\w.-]*)\s*:\s*(.*)/);
+
+      if (parent.type !== 'list') {
+        // Find the key this list belongs to — it should be the last key set
+        // Actually the list should already be created by the key: line before
+      }
+
+      if (keyMatch) {
+        // List of objects
+        const obj = {};
+        const key = keyMatch[1];
+        const val = keyMatch[2].trim();
+
+        if (val === '>' || val === '|') {
+          // Block scalar in list item
+          let block = '';
+          const blockIndent = ind + 2;
+          i++;
+          while (i < lines.length) {
+            const bl = lines[i];
+            if (bl.trim() === '' || currentIndent(bl) >= blockIndent) {
+              block += (block ? '\n' : '') + bl.trim();
+              i++;
+            } else break;
+          }
+          obj[key] = block;
+        } else {
+          obj[key] = parseValue(val);
+          i++;
+        }
+
+        // Read subsequent indented key-value pairs belonging to this list item
+        const itemIndent = ind + 2;
+        while (i < lines.length) {
+          const nextLine = lines[i];
+          const nextTrimmed = nextLine.trim();
+          if (nextTrimmed === '' || nextTrimmed.startsWith('#')) { i++; continue; }
+          const nextInd = currentIndent(nextLine);
+          if (nextInd < itemIndent) break;
+          if (nextTrimmed.startsWith('- ')) break;
+
+          const kvMatch = nextTrimmed.match(/^(\w[\w.-]*)\s*:\s*(.*)/);
+          if (kvMatch) {
+            const k = kvMatch[1];
+            const v = kvMatch[2].trim();
+            if (v === '>' || v === '|') {
+              let block = '';
+              const blockInd = nextInd + 2;
+              i++;
+              while (i < lines.length) {
+                const bl = lines[i];
+                if (bl.trim() === '' || currentIndent(bl) >= blockInd) {
+                  block += (block ? '\n' : '') + bl.trim();
+                  i++;
+                } else break;
+              }
+              obj[k] = block;
+            } else if (v === '') {
+              // Nested structure — peek ahead to determine if array or object
+              const subInd = nextInd + 2;
+              const peekLine = lines.slice(i + 1).find(l => l.trim() !== '' && !l.trim().startsWith('#'));
+              if (peekLine && peekLine.trim().startsWith('- ')) {
+                // Array — parse list items (may be objects or scalars)
+                const arr = [];
+                i++;
+                while (i < lines.length) {
+                  const sl = lines[i];
+                  const st = sl.trim();
+                  if (st === '' || st.startsWith('#')) { i++; continue; }
+                  if (currentIndent(sl) < subInd) break;
+                  if (st.startsWith('- ')) {
+                    const itemContent = st.slice(2).trim();
+                    const itemKV = itemContent.match(/^(\w[\w.-]*)\s*:\s*(.*)/);
+                    if (itemKV) {
+                      // Object list item — read its key-value pairs
+                      const subItem = {};
+                      subItem[itemKV[1]] = parseValue(itemKV[2]);
+                      const itemInd = currentIndent(sl) + 2;
+                      i++;
+                      while (i < lines.length) {
+                        const il = lines[i];
+                        const it = il.trim();
+                        if (it === '' || it.startsWith('#')) { i++; continue; }
+                        if (currentIndent(il) < itemInd || it.startsWith('- ')) break;
+                        const ikv = it.match(/^(\w[\w.-]*)\s*:\s*(.*)/);
+                        if (ikv) { subItem[ikv[1]] = parseValue(ikv[2]); i++; }
+                        else i++;
+                      }
+                      arr.push(subItem);
+                    } else {
+                      arr.push(parseValue(itemContent));
+                      i++;
+                    }
+                  } else {
+                    i++;
+                  }
+                }
+                obj[k] = arr;
+              } else {
+                // Object
+                const subObj = {};
+                i++;
+                while (i < lines.length) {
+                  const sl = lines[i];
+                  const st = sl.trim();
+                  if (st === '' || st.startsWith('#')) { i++; continue; }
+                  if (currentIndent(sl) < subInd) break;
+                  const skv = st.match(/^(\w[\w.-]*)\s*:\s*(.*)/);
+                  if (skv) { subObj[skv[1]] = parseValue(skv[2]); i++; }
+                  else i++;
+                }
+                obj[k] = subObj;
+              }
+            } else {
+              obj[k] = parseValue(v);
+              i++;
+            }
+          } else {
+            i++;
+          }
+        }
+
+        if (Array.isArray(parent.obj)) {
+          parent.obj.push(obj);
+        } else {
+          // Need to find array to push to
+          const lastKey = parent.lastKey;
+          if (lastKey && Array.isArray(parent.obj[lastKey])) {
+            parent.obj[lastKey].push(obj);
+          }
+        }
+      } else {
+        // Simple list item (string/number)
+        const val = parseValue(content);
+        if (Array.isArray(parent.obj)) {
+          parent.obj.push(val);
+        } else {
+          const lastKey = parent.lastKey;
+          if (lastKey && Array.isArray(parent.obj[lastKey])) {
+            parent.obj[lastKey].push(val);
+          }
+        }
+        i++;
+      }
+      continue;
+    }
+
+    // Key: value
+    const kvMatch = trimmed.match(/^(\w[\w.-]*)\s*:\s*(.*)/);
+    if (kvMatch) {
+      const key = kvMatch[1];
+      const val = kvMatch[2].trim();
+
+      if (val === '>' || val === '|') {
+        // Block scalar
+        let block = '';
+        const blockIndent = ind + 2;
+        i++;
+        while (i < lines.length) {
+          const bl = lines[i];
+          if (bl.trim() === '' || currentIndent(bl) >= blockIndent) {
+            block += (block ? '\n' : '') + bl.trim();
+            i++;
+          } else break;
+        }
+        parent.obj[key] = block;
+        parent.lastKey = key;
+      } else if (val === '') {
+        // Nested object or list — peek at next line
+        const nextNonEmpty = lines.slice(i + 1).find(l => l.trim() !== '' && !l.trim().startsWith('#'));
+        if (nextNonEmpty && nextNonEmpty.trim().startsWith('- ')) {
+          parent.obj[key] = [];
+          parent.lastKey = key;
+          stack.push({ obj: parent.obj, indent: ind, type: 'map', lastKey: key });
+        } else {
+          parent.obj[key] = {};
+          stack.push({ obj: parent.obj[key], indent: ind, type: 'map' });
+        }
+        i++;
+      } else {
+        parent.obj[key] = parseValue(val);
+        parent.lastKey = key;
+        i++;
+      }
+    } else {
+      i++;
+    }
+  }
+
+  return root;
+}
+
+function autoDetectStructs() {
+  // Scan workflow steps for struct references and create stubs for missing ones
+  const existing = new Set(state.structs.map(s => s.name));
+  const refs = new Set();
+  state.workflow.steps.forEach(s => {
+    (s.inputs || []).forEach(inp => { if (inp.struct) refs.add(inp.struct); });
+    (s.outputs || []).forEach(out => { if (out.struct) refs.add(out.struct); });
+  });
+  refs.forEach(name => {
+    if (!existing.has(name)) {
+      state.structs.push({
+        name,
+        description: '(auto-detected from workflow)',
+        format: 'json',
+        required_fields: [],
+        frontmatter: [],
+        required_sections: [],
+        file_checks: { exists: true }
+      });
+    }
+  });
+}
+
+function loadWorkflowFromParsed(obj) {
+  const w = state.workflow;
+  w.name = obj.name || '';
+  w.version = obj.version || 1;
+  w.description = obj.description || '';
+
+  // params
+  w.params = [];
+  if (Array.isArray(obj.params)) {
+    obj.params.forEach(p => {
+      w.params.push({
+        name: p.name || '',
+        description: p.description || '',
+        required: p.required === true,
+        default: p.default || ''
+      });
+    });
+  }
+
+  // tools
+  w.tools = [];
+  if (Array.isArray(obj.tools)) {
+    obj.tools.forEach(t => {
+      w.tools.push({
+        name: t.name || '',
+        type: t.type || 'script',
+        command: t.command || '',
+        description: t.description || '',
+        required: t.required !== false,
+        input_schema: t.input_schema ? JSON.stringify(t.input_schema, null, 2) : '',
+        // Phase 38: explicit list of tool names from external MCP servers,
+        // used by init-workflow.py to populate the per-step subagent
+        // whitelist. Stored as comma-separated string for the UI textarea.
+        expected_tools: Array.isArray(t.expected_tools) ? t.expected_tools.join(', ') : '',
+        server_config: t.server_config ? JSON.stringify(t.server_config, null, 2) : '',
+      });
+    });
+  }
+
+  // gate
+  if (obj.gate) {
+    w.gate.structural = obj.gate.structural !== false;
+    w.gate.semantic = obj.gate.semantic === true;
+    w.gate.human = obj.gate.human === true;
+    w.gate.max_step_retries = obj.gate.max_step_retries || 3;
+    w.gate.max_gate_retries = obj.gate.max_gate_retries || 5;
+  }
+
+  // context
+  if (obj.context) {
+    w.context.carry_forward = obj.context.carry_forward || 'none';
+  }
+
+  // steps
+  w.steps = [];
+  if (Array.isArray(obj.steps)) {
+    obj.steps.forEach(s => {
+      const step = {
+        name: s.name || '',
+        goal: s.goal || '',
+        subagent: s.subagent !== false,
+        spec_check: s.spec_check !== false,
+        model: s.model || '',
+        tools: Array.isArray(s.tools) ? s.tools.join(', ') : '',
+        carry_forward: s.carry_forward != null ? s.carry_forward : null,
+        parallel: s.parallel === true,
+        parallel_key: s.parallel_key || '',
+        delegate_to: s.delegate_to || '',
+        delegate_params: {},
+        param_bindings: {},
+        inputs: [],
+        outputs: [],
+        gate: null
+      };
+
+      if (s.params && typeof s.params === 'object' && !Array.isArray(s.params)) {
+        step.delegate_params = { ...s.params };
+      }
+
+      if (s.param_bindings && typeof s.param_bindings === 'object') {
+        step.param_bindings = { ...s.param_bindings };
+      }
+
+      if (Array.isArray(s.inputs)) {
+        s.inputs.forEach(inp => {
+          step.inputs.push({
+            path: inp.path || '',
+            inject: inp.inject || 'file',
+            struct: inp.struct || ''
+          });
+        });
+      }
+
+      if (Array.isArray(s.outputs)) {
+        s.outputs.forEach(out => {
+          step.outputs.push({
+            path: out.path || '',
+            struct: out.struct || ''
+          });
+        });
+      }
+
+      if (s.gate) {
+        step.gate = {};
+        if (s.gate.structural != null) step.gate.structural = s.gate.structural;
+        if (s.gate.semantic != null) step.gate.semantic = s.gate.semantic;
+        if (s.gate.human != null) step.gate.human = s.gate.human;
+        if (s.gate.max_step_retries != null) step.gate.max_step_retries = s.gate.max_step_retries;
+        if (s.gate.max_gate_retries != null) step.gate.max_gate_retries = s.gate.max_gate_retries;
+      }
+
+      w.steps.push(step);
+    });
+  }
+}
+
+// ── Render: Workflow Tab ───────────────────────────────
+function renderWorkflowTab() {
+  const w = state.workflow;
+  let html = '';
+
+  // Metadata (always open)
+  html += `<div class="section-card" id="sec-metadata">
+    <div class="section-header" onclick="toggleSection('metadata')">
+      ${chevronSVG}
+      <div class="section-title">Metadata</div>
+    </div>
+    <div class="section-body">
+      <div class="field-group">
+        <label class="field-label"><span class="required">*</span> Name ${helpBtn('workflow.name')}</label>
+        <input type="text" class="field-input" value="${esc(w.name)}" placeholder="my-workflow"
+               onchange="updateWF('name', this.value)" onblur="validateField(this, 'name')">
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label"><span class="required">*</span> Version ${helpBtn('workflow.version')}</label>
+          <input type="number" class="field-input field-input-num" value="${w.version}" min="1"
+                 onchange="updateWF('version', parseInt(this.value) || 1)">
+        </div>
+        <div class="field-group" style="flex:3">
+          <label class="field-label">Context ${helpBtn('context.carry_forward')}</label>
+          <select class="field-select" style="max-width:180px" onchange="updateWF('carry_forward', this.value)">
+            <option value="none"${w.context.carry_forward === 'none' ? ' selected' : ''}>none</option>
+            <option value="summary"${w.context.carry_forward === 'summary' ? ' selected' : ''}>summary</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label"><span class="required">*</span> Description ${helpBtn('workflow.description')}</label>
+        <textarea class="field-textarea" rows="3" placeholder="What does this workflow do?"
+                  onchange="updateWF('description', this.value)">${esc(w.description)}</textarea>
+      </div>
+    </div>
+  </div>`;
+
+  // Parameters
+  const paramOpen = state.ui.openSections.has('params') ? '' : ' collapsed';
+  html += `<div class="section-card${paramOpen}" id="sec-params">
+    <div class="section-header" onclick="toggleSection('params')">
+      ${chevronSVG}
+      <div class="section-title">Runtime Parameters</div>
+      <span class="section-badge">${w.params.length}</span>
+    </div>
+    <div class="section-body">
+      <div class="field-hint" style="margin-bottom:12px">
+        Runtime arguments passed when the workflow starts. Reference them in step goals and file paths as <code style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px">{param_name}</code>.
+        <br>Example: <code style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px">component</code>, <code style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px">domain</code>, <code style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px">spec_path</code>
+      </div>
+      ${w.params.map((p, i) => `
+        <div class="list-item" style="padding:5px 8px;gap:6px;align-items:center">
+          <input type="text" class="field-input" value="${esc(p.name)}" placeholder="param_name" style="width:120px;flex:0 0 auto;padding:5px 8px;font-size:12px"
+                 onchange="updateParam(${i}, 'name', this.value)" title="Parameter name">
+          <input type="text" class="field-input" value="${esc(p.description)}" placeholder="Description" style="flex:1;min-width:80px;padding:5px 8px;font-size:12px"
+                 onchange="updateParam(${i}, 'description', this.value)" title="Description">
+          <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;flex:0 0 auto" title="If checked, workflow won't start without this param">
+            <input type="checkbox" id="preq${i}" ${p.required ? 'checked' : ''} style="width:13px;height:13px;accent-color:var(--accent)"
+                   onchange="updateParam(${i}, 'required', this.checked)">req
+          </label>
+          <input type="text" class="field-input" value="${esc(p.default)}" placeholder="default" style="width:90px;padding:5px 8px;font-size:11px;flex:0 0 auto${p.required ? ';opacity:0.3;pointer-events:none' : ''}"
+                 onchange="updateParam(${i}, 'default', this.value)" title="Default value (when not required)">
+          <button class="list-remove" onclick="removeParam(${i})" style="margin:0">&times;</button>
+        </div>
+      `).join('')}
+      <button class="add-btn" onclick="addParam()">+ Add Parameter</button>
+    </div>
+  </div>`;
+
+  // Tools section
+  const toolsOpen = state.ui.openSections.has('tools') ? '' : ' collapsed';
+  html += `<div class="section-card${toolsOpen}" id="sec-tools">
+    <div class="section-header" onclick="toggleSection('tools')">
+      ${chevronSVG}
+      <div class="section-title">Tools ${helpBtn('tools')}</div>
+      ${w.tools.length ? `<span class="param-count">${w.tools.length}</span>` : ''}
+    </div>
+    <div class="section-body">
+      ${w.tools.map((t, i) => `
+        <div style="background:var(--bg-section);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            ${helpBtn('tool.type')}
+            <select class="field-input" style="width:auto;padding:4px 8px;font-size:12px;flex:0 0 auto"
+                    onchange="updateTool(${i}, 'type', this.value)">
+              <option value="script" ${t.type === 'script' ? 'selected' : ''}>script — command wrapped as MCP proxy</option>
+              <option value="mcp" ${t.type === 'mcp' ? 'selected' : ''}>mcp — external MCP server dependency</option>
+            </select>
+            <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:140px">
+              <label style="font-size:11px;color:var(--text-secondary)">Tool name ${helpBtn('tool.name')}</label>
+              <input type="text" class="field-input" value="${esc(t.name)}" placeholder="e.g. count_lines" style="padding:5px 8px;font-size:12px"
+                     onchange="updateTool(${i}, 'name', this.value)">
+              <span style="font-size:10px;color:var(--text-muted)">Unique identifier, used in step-level tools: filter</span>
+            </div>
+            <button class="list-remove" onclick="removeTool(${i})" style="margin:0;flex:0 0 auto;align-self:flex-start">&times;</button>
+          </div>
+          ${t.type === 'script' ? `
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:180px">
+                <label style="font-size:11px;color:var(--text-secondary)">Command ${helpBtn('tool.command')}</label>
+                <input type="text" class="field-input" value="${esc(t.command)}" placeholder="python .agent/scripts/my-tool.py" style="padding:5px 8px;font-size:12px"
+                       onchange="updateTool(${i}, 'command', this.value)">
+                <span style="font-size:10px;color:var(--text-muted)">Shell command to execute</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:120px">
+                <label style="font-size:11px;color:var(--text-secondary)">Description ${helpBtn('tool.description')}</label>
+                <input type="text" class="field-input" value="${esc(t.description)}" placeholder="Human-readable description for LLM" style="padding:5px 8px;font-size:12px"
+                       onchange="updateTool(${i}, 'description', this.value)">
+                <span style="font-size:10px;color:var(--text-muted)">Shown to the LLM so it knows when to call this tool</span>
+              </div>
+            </div>
+            <details style="margin-top:8px">
+              <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;user-select:none">Input Schema ${helpBtn('tool.input_schema')} <span style="font-size:10px;color:var(--text-muted)">(optional)</span></summary>
+              <div style="margin-top:6px">
+                <span style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">JSON Schema for tool arguments. Validates arguments before calling.</span>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                  <button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="fillSchemaTemplate(${i})">Template</button>
+                  <span style="font-size:10px;color:var(--text-muted)">Insert a starter schema</span>
+                </div>
+                <textarea class="field-input" placeholder='{"type":"object","required":["file_path"],"properties":{"file_path":{"type":"string"}}}' style="width:100%;min-height:60px;font-size:11px;font-family:var(--mono);resize:vertical;padding:5px 8px"
+                          onchange="updateTool(${i}, 'input_schema', this.value)">${esc(t.input_schema)}</textarea>
+              </div>
+            </details>
+          ` : `
+            <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer">
+                <input type="checkbox" ${t.required ? 'checked' : ''} style="width:14px;height:14px;accent-color:var(--accent)"
+                       onchange="updateTool(${i}, 'required', this.checked)">
+                <span>Required ${helpBtn('tool.required')} <span style="font-size:10px;color:var(--text-muted)">(blocks workflow if unavailable)</span></span>
+              </label>
+              <span style="font-size:11px;color:var(--text-muted);font-style:italic">Description comes from the MCP server automatically</span>
+            </div>
+            <details style="margin-top:8px" open>
+              <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;user-select:none">Expected Tools ${helpBtn('tool.expected_tools')} <span style="font-size:10px;color:var(--text-muted)">(required for Claude Code per-step subagents)</span></summary>
+              <div style="margin-top:6px">
+                <span style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">Comma-separated list of tool names from this MCP server that workflow steps will use. Init-workflow.py writes these into the per-step subagent's tools whitelist as mcp__&lt;server&gt;__&lt;tool&gt;.</span>
+                <input type="text" class="field-input" placeholder="extract_text, get_metadata, count_pages" style="width:100%;font-size:11px;font-family:var(--mono);padding:5px 8px"
+                       value="${esc(t.expected_tools)}"
+                       onchange="updateTool(${i}, 'expected_tools', this.value)">
+              </div>
+            </details>
+            <details style="margin-top:8px">
+              <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;user-select:none">Server Config ${helpBtn('tool.server_config')} <span style="font-size:10px;color:var(--text-muted)">(optional, legacy)</span></summary>
+              <div style="margin-top:6px">
+                <span style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px">Legacy field — kept for backward compatibility. In Phase 38 the loader is registered in .mcp.json/.cursor/mcp.json and external MCP servers are managed by the user.</span>
+                <textarea class="field-input" placeholder='{"command":"python","args":[".agent/mcp/server.py"]}' style="width:100%;min-height:60px;font-size:11px;font-family:var(--mono);resize:vertical;padding:5px 8px"
+                          onchange="updateTool(${i}, 'server_config', this.value)">${esc(t.server_config)}</textarea>
+              </div>
+            </details>
+          `}
+        </div>
+      `).join('')}
+      <button class="add-btn" onclick="addTool()">+ Add Tool</button>
+    </div>
+  </div>`;
+
+  // Gate defaults
+  const gateOpen = state.ui.openSections.has('gate') ? '' : ' collapsed';
+  const g = w.gate;
+  html += `<div class="section-card${gateOpen}" id="sec-gate">
+    <div class="section-header" onclick="toggleSection('gate')">
+      ${chevronSVG}
+      <div class="section-title">Gate Defaults</div>
+      <div class="gate-chips">
+        <span class="gate-chip ${g.structural ? 'gate-chip-on' : 'gate-chip-off'}"><span class="gate-dot"></span>structural</span>
+        <span class="gate-chip ${g.semantic ? 'gate-chip-on' : 'gate-chip-off'}"><span class="gate-dot"></span>semantic</span>
+        <span class="gate-chip ${g.human ? 'gate-chip-on' : 'gate-chip-off'}"><span class="gate-dot"></span>human</span>
+        <span class="gate-chip" style="background:var(--blue-bg);color:var(--blue)">gate: ${g.max_gate_retries}</span>
+        <span class="gate-chip" style="background:var(--purple-bg);color:var(--purple)">step: ${g.max_step_retries}</span>
+      </div>
+    </div>
+    <div class="section-body">
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <span class="step-chip ${g.structural ? 'step-chip-on' : 'step-chip-off'}" onclick="updateGate('structural', !state.workflow.gate.structural)" style="cursor:pointer"><span class="step-chip-dot"></span><span class="step-chip-key">structural</span></span>${helpBtn('gate.structural')}
+        <span class="step-chip ${g.semantic ? 'step-chip-on' : 'step-chip-off'}" onclick="updateGate('semantic', !state.workflow.gate.semantic)" style="cursor:pointer"><span class="step-chip-dot"></span><span class="step-chip-key">semantic</span></span>${helpBtn('gate.semantic')}
+        <span class="step-chip ${g.human ? 'step-chip-on' : 'step-chip-off'}" onclick="updateGate('human', !state.workflow.gate.human)" style="cursor:pointer"><span class="step-chip-dot"></span><span class="step-chip-key">human</span></span>${helpBtn('gate.human')}
+        <span style="width:1px;height:18px;background:var(--border);margin:0 4px"></span>
+        <span style="font-size:11px;color:var(--text-muted)">step retries:</span>${helpBtn('gate.max_step_retries')}
+        <input type="number" class="field-input field-input-num" value="${g.max_step_retries}" min="0" max="10" style="width:50px;padding:3px 6px;font-size:11px"
+               onchange="updateGate('max_step_retries', parseInt(this.value) || 3)">
+        <span style="font-size:11px;color:var(--text-muted)">gate retries:</span>${helpBtn('gate.max_gate_retries')}
+        <input type="number" class="field-input field-input-num" value="${g.max_gate_retries}" min="0" max="25" style="width:50px;padding:3px 6px;font-size:11px"
+               onchange="updateGate('max_gate_retries', parseInt(this.value) || 5)">
+      </div>
+    </div>
+  </div>`;
+
+  // Steps
+  html += `<div class="flex-between" style="margin-bottom:12px">
+    <div class="section-title" style="font-size:13px">STEPS</div>
+    <button class="add-btn" onclick="addStep()">+ Add Step</button>
+  </div>`;
+
+  if (w.steps.length === 0) {
+    html += `<div class="empty-state">No steps yet. Click "Add Step" to create your first step.</div>`;
+  }
+
+  w.steps.forEach((s, i) => {
+    const open = state.ui.openSteps.has(i);
+    html += renderStepCard(s, i, open);
+  });
+
+  document.getElementById('workflowTab').innerHTML = html;
+  updateStructCount();
+  if (state.ui.yamlPreview) renderPreview();
+}
+
+function renderStepCard(s, i, open) {
+  const collapsed = open ? '' : ' collapsed';
+  const nameDisplay = s.name || 'Untitled step';
+  const nameClass = s.name ? '' : ' empty';
+  const chips = [];
+  if (s.inputs.length) chips.push(`<span class="chip chip-blue">${s.inputs.length} input${s.inputs.length > 1 ? 's' : ''}</span>`);
+  if (s.outputs.length) chips.push(`<span class="chip chip-purple">${s.outputs.length} output${s.outputs.length > 1 ? 's' : ''}</span>`);
+  if (s.carry_forward != null) chips.push(`<span class="chip chip-blue">carry_forward: ${s.carry_forward ? 'on' : 'off'}</span>`);
+  if (s.parallel) chips.push(`<span class="chip chip-amber">parallel</span>`);
+  if (s.delegate_to) chips.push(`<span class="chip chip-green">delegate</span>`);
+  if (s.gate) chips.push(`<span class="chip chip-amber">gate override</span>`);
+  if (Object.keys(s.param_bindings || {}).length) chips.push(`<span class="chip chip-purple">bindings</span>`);
+
+  let html = `<div class="step-card${collapsed}">
+    <div class="step-header" onclick="toggleStep(${i})">
+      ${stepChevronSVG}
+      <span class="step-num">${i + 1}</span>
+      <span class="step-name${nameClass}">${esc(nameDisplay)}</span>
+      <span class="step-chips">${chips.join('')}</span>
+      <span class="step-actions" onclick="event.stopPropagation()">
+        <button class="btn-icon" onclick="moveStep(${i},-1)" title="Move up" ${i === 0 ? 'disabled style="opacity:0.3"' : ''}>&#x25B2;</button>
+        <button class="btn-icon" onclick="moveStep(${i},1)" title="Move down" ${i === state.workflow.steps.length - 1 ? 'disabled style="opacity:0.3"' : ''}>&#x25BC;</button>
+        <button class="btn-icon danger" onclick="removeStep(${i})" title="Delete step">&times;</button>
+      </span>
+    </div>
+    <div class="step-details">`;
+
+  // Basic fields
+  html += `
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label"><span class="required">*</span> Name ${helpBtn('step.name')}</label>
+        <input type="text" class="field-input" value="${esc(s.name)}" placeholder="step-name"
+               onchange="updateStep(${i}, 'name', this.value)">
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label"><span class="required">*</span> Goal ${helpBtn('step.goal')}</label>
+      <textarea class="field-textarea goal" placeholder="Detailed instructions for the subagent..."
+                onchange="updateStep(${i}, 'goal', this.value)">${esc(s.goal)}</textarea>
+    </div>`;
+
+  // Step config chips (trace-viewer style)
+  const cfgEffective = {
+    spec_check: s.spec_check,
+    subagent: s.subagent,
+    carry_forward: s.carry_forward,
+  };
+  const wfGate = state.workflow.gate;
+  const stepGate = s.gate || {};
+  const hasGateOverride = s.gate && Object.keys(s.gate).length > 0;
+
+  html += `<div style="margin-bottom:12px">
+    <div class="field-label" style="margin-bottom:6px">Step Config${hasGateOverride ? ' <span style="font-size:9px;opacity:0.5;font-weight:400">(dashed = step override)</span>' : ''} ${helpBtn('step.subagent')}</div>
+    <div class="step-config-chips">`;
+
+  // spec_check chip
+  html += `<span class="step-chip ${s.spec_check ? 'step-chip-on' : 'step-chip-off'}" onclick="toggleStepChip(${i},'spec_check')" title="Click to toggle. ${esc(HELP['step.spec_check'])}"><span class="step-chip-dot"></span><span class="step-chip-key">spec_check</span></span>`;
+
+  // subagent chip
+  html += `<span class="step-chip ${s.subagent ? 'step-chip-on' : 'step-chip-off'}" onclick="toggleStepChip(${i},'subagent')" title="Click to toggle. ${esc(HELP['step.subagent'])}"><span class="step-chip-dot"></span><span class="step-chip-key">subagent</span></span>`;
+
+  // carry_forward chip (tri-state: null=inherit, true, false)
+  const cfLabel = s.carry_forward === true ? 'ON' : s.carry_forward === false ? 'OFF' : 'inherit';
+  const cfClass = s.carry_forward === true ? 'step-chip-on' : s.carry_forward === false ? 'step-chip-off' : 'step-chip-off';
+  const cfStyle = s.carry_forward == null ? ' style="border-style:dashed"' : '';
+  html += `<span class="step-chip ${cfClass}"${cfStyle} onclick="cycleCarryForward(${i})" title="Click to cycle (inherit → ON → OFF). ${esc(HELP['step.carry_forward'])}"><span class="step-chip-dot"></span><span class="step-chip-key">carry_forward: ${cfLabel}</span></span>`;
+
+  // Gate chips — show effective config
+  ['structural', 'semantic', 'human'].forEach(name => {
+    const isOverride = stepGate[name] != null;
+    const effective = isOverride ? stepGate[name] : (wfGate[name] ?? false);
+    const overrideClass = isOverride ? ' step-chip-override' : '';
+    html += `<span class="step-chip ${effective ? 'step-chip-on' : 'step-chip-off'}${overrideClass}" onclick="toggleGateChip(${i},'${name}')" title="Click to toggle override. gate.${name}${isOverride ? ' (step override)' : ' (from workflow)'}"><span class="step-chip-dot"></span><span class="step-chip-key">gate.${name}</span></span>`;
+  });
+
+  // Parallel and Delegation quick-enable chips (only when off)
+  if (!s.parallel) {
+    html += `<span class="step-chip step-chip-off" onclick="updateStep(${i},'parallel',true)" title="Click to enable parallel fan-out" style="border-style:dashed;cursor:pointer"><span class="step-chip-dot"></span><span class="step-chip-key">+ parallel</span></span>`;
+  }
+  if (!s.delegate_to) {
+    html += `<span class="step-chip step-chip-off" onclick="promptDelegation(${i})" title="Click to set delegation target" style="border-style:dashed;cursor:pointer"><span class="step-chip-dot"></span><span class="step-chip-key">+ delegate</span></span>`;
+  }
+
+  // (model field rendered separately below chips)
+
+  html += `</div>`;
+
+  // Model preference — only for subagent steps (inline steps use orchestrator's model)
+  if (s.subagent) html += `<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+    <span class="field-label" style="margin:0;font-size:11px;min-width:130px">Preferred model ${helpBtn('step.model')}</span>
+    <select class="field-select" style="width:200px;padding:3px 8px;font-size:12px;font-family:var(--mono)"
+      onchange="updateStep(${i},'model',this.value)"
+      title="${esc(HELP['step.model'])}">
+      <option value=""${!s.model ? ' selected' : ''}>(inherit from orchestrator)</option>
+      <optgroup label="Claude — current">
+        <option value="claude-opus-4-6"${s.model === 'claude-opus-4-6' ? ' selected' : ''}>claude-opus-4-6</option>
+        <option value="claude-sonnet-4-6"${s.model === 'claude-sonnet-4-6' ? ' selected' : ''}>claude-sonnet-4-6</option>
+        <option value="claude-haiku-4-5-20251001"${s.model === 'claude-haiku-4-5-20251001' ? ' selected' : ''}>claude-haiku-4-5</option>
+      </optgroup>
+      <optgroup label="Claude — shorthand">
+        <option value="opus"${s.model === 'opus' ? ' selected' : ''}>opus</option>
+        <option value="sonnet"${s.model === 'sonnet' ? ' selected' : ''}>sonnet</option>
+        <option value="haiku"${s.model === 'haiku' ? ' selected' : ''}>haiku</option>
+      </optgroup>
+      <optgroup label="Claude — legacy">
+        <option value="claude-sonnet-4-5-20250929"${s.model === 'claude-sonnet-4-5-20250929' ? ' selected' : ''}>claude-sonnet-4-5</option>
+        <option value="claude-sonnet-4-20250514"${s.model === 'claude-sonnet-4-20250514' ? ' selected' : ''}>claude-sonnet-4</option>
+        <option value="claude-opus-4-20250514"${s.model === 'claude-opus-4-20250514' ? ' selected' : ''}>claude-opus-4</option>
+      </optgroup>
+    </select>
+    <input type="text" class="field-input" value="${esc(s.model && !['haiku','sonnet','opus','claude-opus-4-6','claude-sonnet-4-6','claude-haiku-4-5-20251001','claude-sonnet-4-5-20250929','claude-sonnet-4-20250514','claude-opus-4-20250514'].includes(s.model) ? s.model : '')}"
+      placeholder="or type custom model ID"
+      style="flex:1;padding:3px 8px;font-size:12px;font-family:var(--mono);min-width:160px"
+      onchange="if(this.value.trim()){updateStep(${i},'model',this.value.trim());this.previousElementSibling.value='';}"
+      title="Custom model ID (e.g., gpt-4o, gemini-2.0-flash). Overrides the dropdown.">
+  </div>`;  // end model preference
+
+  // Step tools — only show if workflow has tools defined
+  if (state.workflow.tools.length > 0) {
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span class="field-label" style="margin:0;font-size:11px;min-width:130px">Step tools ${helpBtn('step.tools')}</span>
+      <input type="text" class="field-input" value="${esc(s.tools || '')}"
+        placeholder="Comma-separated tool names, or empty for all"
+        style="flex:1;padding:3px 8px;font-size:12px;font-family:var(--mono);min-width:160px"
+        onchange="updateStep(${i},'tools',this.value)"
+        title="Restrict which workflow-level tools this step can use. Leave empty to allow all tools.">
+    </div>`;
+  }
+
+  // Gate retry overrides + Clear — inline right after chips
+  if (hasGateOverride) {
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text-muted)">step retries:</span>
+      <input type="number" class="field-input field-input-num" value="${s.gate.max_step_retries != null ? s.gate.max_step_retries : ''}" min="0" max="10" placeholder="—" style="width:50px;padding:3px 6px;font-size:11px"
+             onchange="updateStepGate(${i}, 'max_step_retries', this.value ? parseInt(this.value) : null)" title="Max step retries (new subagent spawns)">
+      <span style="font-size:11px;color:var(--text-muted)">gate retries:</span>
+      <input type="number" class="field-input field-input-num" value="${s.gate.max_gate_retries != null ? s.gate.max_gate_retries : ''}" min="0" max="25" placeholder="—" style="width:50px;padding:3px 6px;font-size:11px"
+             onchange="updateStepGate(${i}, 'max_gate_retries', this.value ? parseInt(this.value) : null)" title="Max gate retries (in-place self-correction)">
+      <button class="btn btn-sm btn-danger" onclick="clearStepGate(${i})" style="font-size:10px;padding:2px 8px;margin-left:auto" title="Remove all gate overrides">Clear overrides</button>
+    </div>`;
+  }
+
+  html += `</div>`;
+
+  // Parallel (compact — inline when off)
+  if (s.parallel) {
+    html += `<div class="subsection">
+      <div class="flex-between">
+        <div class="subsection-title mb-0">Parallel ${helpBtn('step.parallel')}</div>
+        <button class="btn btn-sm" onclick="updateStep(${i}, 'parallel', false)" style="font-size:11px;padding:2px 8px">Disable</button>
+      </div>
+      <div class="field-group mt-8">
+        <label class="field-label"><span class="required">*</span> Parallel key ${helpBtn('step.parallel_key')}</label>
+        <input type="text" class="field-input" value="${esc(s.parallel_key)}" placeholder='manifest.tasks[status=pending]' style="font-size:12px;padding:5px 8px"
+               onchange="updateStep(${i}, 'parallel_key', this.value)">
+      </div>
+    </div>`;
+  }
+
+  // Delegation (compact — inline when off)
+  if (s.delegate_to) {
+    html += `<div class="subsection">
+      <div class="subsection-title">Delegation ${helpBtn('step.delegate_to')}</div>
+      <div class="field-group">
+        <input type="text" class="field-input" value="${esc(s.delegate_to)}" placeholder="workflow-name" style="font-size:12px;padding:5px 8px"
+               onchange="updateStep(${i}, 'delegate_to', this.value)">
+      </div>
+      <div class="subsection-title mt-8">Params ${helpBtn('step.delegate_params')}</div>
+      ${Object.entries(s.delegate_params || {}).map(([k, v], pi) => `
+        <div class="field-row" style="margin-bottom:4px">
+          <input type="text" class="field-input" value="${esc(k)}" placeholder="key" style="max-width:120px;font-size:12px;padding:4px 8px"
+                 onchange="renameDelegateParam(${i}, '${esc(k)}', this.value)">
+          <input type="text" class="field-input" value="${esc(v)}" placeholder="value or {param}" style="font-size:12px;padding:4px 8px"
+                 onchange="updateDelegateParam(${i}, '${esc(k)}', this.value)">
+          <button class="list-remove" onclick="removeDelegateParam(${i}, '${esc(k)}')">&times;</button>
+        </div>
+      `).join('')}
+      <button class="add-btn" onclick="addDelegateParam(${i})">+ Add Param</button>
+    </div>`;
+  }
+
+  // Inputs (compact single-row)
+  html += `<div class="subsection">
+    <div class="flex-between">
+      <div class="subsection-title mb-0">Inputs ${helpBtn('input.path')}</div>
+      <button class="add-btn" onclick="addInput(${i})">+ Add</button>
+    </div>
+    ${s.inputs.map((inp, j) => `
+      <div class="list-item mt-8" style="padding:5px 8px;gap:6px;align-items:center">
+        <input type="text" class="field-input" value="${esc(inp.path)}" placeholder=".agent/specs/**/*.md" style="flex:1;min-width:0;padding:5px 8px;font-size:12px"
+               onchange="updateInput(${i}, ${j}, 'path', this.value)">
+        <select class="field-select" onchange="updateInput(${i}, ${j}, 'inject', this.value)" style="max-width:120px;padding:5px 26px 5px 8px;font-size:11px" title="Inject mode">
+          <option value="file"${inp.inject === 'file' ? ' selected' : ''}>file</option>
+          <option value="file_if_exists"${inp.inject === 'file_if_exists' ? ' selected' : ''}>if_exists</option>
+          <option value="reference"${inp.inject === 'reference' ? ' selected' : ''}>reference</option>
+        </select>
+        ${structDropdown(inp.struct, `handleStructSelect(this, ${i}, ${j}, 'input')`).replace('style="max-width:180px"', 'style="max-width:130px;padding:5px 26px 5px 8px;font-size:11px" title="Struct schema"')}
+        <button class="list-remove" onclick="removeInput(${i}, ${j})" style="margin:0">&times;</button>
+      </div>
+    `).join('')}
+    ${s.inputs.length === 0 ? '<div class="field-hint mt-8">No inputs defined.</div>' : ''}
+  </div>`;
+
+  // Outputs (compact single-row)
+  html += `<div class="subsection">
+    <div class="flex-between">
+      <div class="subsection-title mb-0">Outputs ${helpBtn('output.path')}</div>
+      <button class="add-btn" onclick="addOutput(${i})">+ Add</button>
+    </div>
+    ${s.outputs.map((out, j) => `
+      <div class="list-item mt-8" style="padding:5px 8px;gap:6px;align-items:center">
+        <input type="text" class="field-input" value="${esc(out.path)}" placeholder=".agent/workflows/my-wf/data/output.json" style="flex:1;min-width:0;padding:5px 8px;font-size:12px"
+               onchange="updateOutput(${i}, ${j}, 'path', this.value)">
+        ${structDropdown(out.struct, `handleStructSelect(this, ${i}, ${j}, 'output')`).replace('style="max-width:180px"', 'style="max-width:130px;padding:5px 26px 5px 8px;font-size:11px" title="Struct schema"')}
+        <button class="list-remove" onclick="removeOutput(${i}, ${j})" style="margin:0">&times;</button>
+      </div>
+    `).join('')}
+    ${s.outputs.length === 0 ? '<div class="field-hint mt-8">No outputs defined. Steps without outputs skip structural gate validation.</div>' : ''}
+  </div>`;
+
+  // Param bindings
+  const pbKeys = Object.keys(s.param_bindings || {});
+  if (pbKeys.length > 0 || s.outputs.length > 0) {
+    html += `<div class="subsection">
+      <div class="flex-between">
+        <div class="subsection-title mb-0">Param Bindings ${helpBtn('step.param_bindings')}</div>
+        <button class="add-btn" onclick="addParamBinding(${i})">+ Add</button>
+      </div>
+      <div class="field-hint" style="margin:6px 0 8px">Update workflow params from step outputs after gate passes. Syntax: <code style="background:var(--bg-hover);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px">data/output.json::field</code></div>
+      ${pbKeys.map(k => `
+        <div class="field-row" style="margin-bottom:6px">
+          <input type="text" class="field-input" value="${esc(k)}" placeholder="param_name" style="max-width:140px"
+                 onchange="renameParamBinding(${i}, '${esc(k)}', this.value)">
+          <input type="text" class="field-input" value="${esc(s.param_bindings[k])}" placeholder="data/output.json::field"
+                 onchange="updateParamBinding(${i}, '${esc(k)}', this.value)">
+          <button class="list-remove" onclick="removeParamBinding(${i}, '${esc(k)}')">&times;</button>
+        </div>
+      `).join('')}
+      ${pbKeys.length === 0 ? '<div class="field-hint mt-8">No bindings defined. Add one to pipe step outputs into workflow params.</div>' : ''}
+    </div>`;
+  }
+
+  html += `</div></div>`;
+  return html;
+}
+
+// ── Render: Structs Tab ────────────────────────────────
+function renderStructsTab() {
+  let html = `<div class="flex-between" style="margin-bottom:12px">
+    <div class="section-title" style="font-size:13px">STRUCT SCHEMAS</div>
+    <button class="add-btn" onclick="addStruct()">+ Add Schema</button>
+  </div>`;
+
+  if (state.structs.length === 0) {
+    html += `<div class="empty-state">No struct schemas yet. Click "Add Schema" to create one.<br><small>Struct schemas validate step inputs and outputs.</small></div>`;
+  }
+
+  state.structs.forEach((s, i) => {
+    const open = state.ui.openStructs.has(i);
+    html += renderStructCard(s, i, open);
+  });
+
+  document.getElementById('structsTab').innerHTML = html;
+  updateStructCount();
+}
+
+function renderStructCard(s, i, open) {
+  const collapsed = open ? '' : ' collapsed';
+  const nameDisplay = s.name || 'Untitled schema';
+  const nameClass = s.name ? '' : ' empty';
+  const formatBadge = s.format ? `<span class="chip chip-purple">${s.format}</span>` : '';
+
+  let html = `<div class="struct-card${collapsed}">
+    <div class="struct-header" onclick="toggleStruct(${i})">
+      ${chevronSVG}
+      <span class="struct-icon">S</span>
+      <span class="struct-name${nameClass}">${esc(nameDisplay)}</span>
+      ${formatBadge}
+      <span class="step-actions" onclick="event.stopPropagation()">
+        <button class="btn-icon danger" onclick="removeStruct(${i})" title="Delete schema">&times;</button>
+      </span>
+    </div>
+    <div class="struct-details">`;
+
+  // Basic fields
+  html += `
+    <div class="field-group">
+      <label class="field-label"><span class="required">*</span> Name ${helpBtn('struct.name')}</label>
+      <input type="text" class="field-input" value="${esc(s.name)}" placeholder="my-schema"
+             onchange="updateStruct(${i}, 'name', this.value)">
+    </div>
+    <div class="field-group">
+      <label class="field-label"><span class="required">*</span> Description ${helpBtn('struct.description')}</label>
+      <input type="text" class="field-input" value="${esc(s.description)}" placeholder="What this schema validates"
+             onchange="updateStruct(${i}, 'description', this.value)">
+    </div>
+    <div class="field-group">
+      <label class="field-label"><span class="required">*</span> Format ${helpBtn('struct.format')}</label>
+      <select class="field-select" style="max-width:180px" onchange="updateStruct(${i}, 'format', this.value)">
+        <option value="json"${s.format === 'json' ? ' selected' : ''}>json</option>
+        <option value="yaml"${s.format === 'yaml' ? ' selected' : ''}>yaml</option>
+        <option value="markdown"${s.format === 'markdown' ? ' selected' : ''}>markdown</option>
+        <option value="text"${s.format === 'text' ? ' selected' : ''}>text</option>
+      </select>
+    </div>`;
+
+  // JSON/YAML schema
+  if (s.format === 'json' || s.format === 'yaml') {
+    html += `<div class="subsection">
+      <div class="flex-between">
+        <div class="subsection-title mb-0">Required Fields ${helpBtn('struct.field')}</div>
+        <button class="add-btn" onclick="addRequiredField(${i})">+ Add Field</button>
+      </div>
+      ${(s.required_fields || []).map((f, j) => `
+        <div class="list-item mt-8">
+          <div style="flex:1">
+            <div class="field-row">
+              <div class="field-group" style="flex:2">
+                <label class="field-label">Field path</label>
+                <input type="text" class="field-input" value="${esc(f.field)}" placeholder="metadata.version"
+                       onchange="updateRequiredField(${i}, ${j}, 'field', this.value)">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Type ${helpBtn('struct.field_type')}</label>
+                <select class="field-select" onchange="updateRequiredField(${i}, ${j}, 'type', this.value)">
+                  <option value="string"${f.type === 'string' ? ' selected' : ''}>string</option>
+                  <option value="number"${f.type === 'number' ? ' selected' : ''}>number</option>
+                  <option value="boolean"${f.type === 'boolean' ? ' selected' : ''}>boolean</option>
+                  <option value="array"${f.type === 'array' ? ' selected' : ''}>array</option>
+                  <option value="object"${f.type === 'object' ? ' selected' : ''}>object</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-group">
+                <label class="field-label">Pattern ${helpBtn('struct.pattern')}</label>
+                <input type="text" class="field-input" value="${esc(f.pattern || '')}" placeholder="regex (optional)"
+                       onchange="updateRequiredField(${i}, ${j}, 'pattern', this.value)">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Enum ${helpBtn('struct.enum')}</label>
+                <input type="text" class="field-input" value="${esc(f.enum_values || '')}" placeholder="val1, val2 (optional)"
+                       onchange="updateRequiredField(${i}, ${j}, 'enum_values', this.value)">
+              </div>
+              ${f.type === 'array' ? `
+                <div class="field-group">
+                  <label class="field-label">Min items ${helpBtn('struct.min_items')}</label>
+                  <input type="number" class="field-input field-input-num" value="${f.min_items || ''}" min="0" placeholder="0"
+                         onchange="updateRequiredField(${i}, ${j}, 'min_items', this.value ? parseInt(this.value) : null)">
+                </div>` : ''}
+            </div>
+          </div>
+          <button class="list-remove" onclick="removeRequiredField(${i}, ${j})">&times;</button>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  // Markdown schema
+  if (s.format === 'markdown') {
+    // Frontmatter
+    html += `<div class="subsection">
+      <div class="flex-between">
+        <div class="subsection-title mb-0">Frontmatter Fields ${helpBtn('struct.fm_field')}</div>
+        <button class="add-btn" onclick="addFrontmatterField(${i})">+ Add</button>
+      </div>
+      ${(s.frontmatter || []).map((f, j) => `
+        <div class="list-item mt-8">
+          <div style="flex:1">
+            <div class="field-row">
+              <div class="field-group">
+                <label class="field-label">Field</label>
+                <input type="text" class="field-input" value="${esc(f.field)}" placeholder="spec_id"
+                       onchange="updateFrontmatterField(${i}, ${j}, 'field', this.value)">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Type ${helpBtn('struct.fm_type')}</label>
+                <select class="field-select" onchange="updateFrontmatterField(${i}, ${j}, 'type', this.value)">
+                  <option value="string"${f.type === 'string' ? ' selected' : ''}>string</option>
+                  <option value="number"${f.type === 'number' ? ' selected' : ''}>number</option>
+                  <option value="enum"${f.type === 'enum' ? ' selected' : ''}>enum</option>
+                  <option value="list"${f.type === 'list' ? ' selected' : ''}>list</option>
+                  <option value="boolean"${f.type === 'boolean' ? ' selected' : ''}>boolean</option>
+                </select>
+              </div>
+            </div>
+            ${f.type === 'string' ? `
+              <div class="field-group">
+                <label class="field-label">Pattern</label>
+                <input type="text" class="field-input" value="${esc(f.pattern || '')}" placeholder="regex (optional)"
+                       onchange="updateFrontmatterField(${i}, ${j}, 'pattern', this.value)">
+              </div>` : ''}
+            ${f.type === 'enum' ? `
+              <div class="field-group">
+                <label class="field-label">Values ${helpBtn('struct.fm_values')}</label>
+                <input type="text" class="field-input" value="${esc(f.values || '')}" placeholder="val1, val2, val3"
+                       onchange="updateFrontmatterField(${i}, ${j}, 'values', this.value)">
+              </div>` : ''}
+          </div>
+          <button class="list-remove" onclick="removeFrontmatterField(${i}, ${j})">&times;</button>
+        </div>
+      `).join('')}
+    </div>`;
+
+    // Required sections
+    html += `<div class="subsection">
+      <div class="flex-between">
+        <div class="subsection-title mb-0">Required Sections ${helpBtn('struct.required_sections')}</div>
+        <button class="add-btn" onclick="addRequiredSection(${i})">+ Add</button>
+      </div>
+      ${(s.required_sections || []).map((sec, j) => `
+        <div class="field-row mt-8">
+          <input type="text" class="field-input" value="${esc(sec)}" placeholder="Section Name"
+                 onchange="updateRequiredSection(${i}, ${j}, this.value)">
+          <button class="list-remove" onclick="removeRequiredSection(${i}, ${j})">&times;</button>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  // File checks (all formats)
+  const fc = s.file_checks || {};
+  html += `<div class="subsection">
+    <div class="subsection-title">File Checks ${helpBtn('struct.file_exists')}</div>
+    <div class="check-group">
+      <input type="checkbox" id="fcEx${i}" ${fc.exists !== false ? 'checked' : ''}
+             onchange="updateFileCheck(${i}, 'exists', this.checked)">
+      <label class="check-label" for="fcEx${i}">File must exist</label>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Min size (bytes) ${helpBtn('struct.min_size')}</label>
+        <input type="number" class="field-input field-input-num" value="${fc.min_size || ''}" min="0" placeholder="0"
+               onchange="updateFileCheck(${i}, 'min_size', this.value ? parseInt(this.value) : null)">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Max size (bytes) ${helpBtn('struct.max_size')}</label>
+        <input type="number" class="field-input field-input-num" value="${fc.max_size || ''}" min="0" placeholder="none"
+               onchange="updateFileCheck(${i}, 'max_size', this.value ? parseInt(this.value) : null)">
+      </div>
+      <div class="field-group" style="flex:2">
+        <label class="field-label">Name pattern ${helpBtn('struct.name_pattern')}</label>
+        <input type="text" class="field-input" value="${esc(fc.name_pattern || '')}" placeholder="regex (optional)"
+               onchange="updateFileCheck(${i}, 'name_pattern', this.value || null)">
+      </div>
+    </div>
+  </div>`;
+
+  html += `</div></div>`;
+  return html;
+}
+
+// ── Render: YAML Preview ───────────────────────────────
+function renderPreview() {
+  const yaml = generateWorkflowYAML(state.workflow);
+  // Basic syntax coloring
+  const colored = yaml.split('\n').map(line => {
+    // Comment
+    if (line.trim().startsWith('#')) return `<span class="yc">${esc(line)}</span>`;
+    // Key: value
+    const m = line.match(/^(\s*(?:- )?)(\w[\w.-]*)(:\s*)(.*)/);
+    if (m) {
+      return esc(m[1]) + `<span class="yk">${esc(m[2])}</span>` + esc(m[3]) + (m[4] ? `<span class="yv">${esc(m[4])}</span>` : '');
+    }
+    // List item without key
+    const lm = line.match(/^(\s*- )(.*)/);
+    if (lm) return esc(lm[1]) + `<span class="yv">${esc(lm[2])}</span>`;
+    return esc(line);
+  }).join('\n');
+  document.getElementById('previewBody').innerHTML = colored;
+}
+
+let previewTimer = null;
+function schedulePreview() {
+  if (!state.ui.yamlPreview) return;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(renderPreview, 200);
+}
+
+// ── State Mutations ────────────────────────────────────
+function updateWF(field, value) {
+  if (field === 'carry_forward') {
+    state.workflow.context.carry_forward = value;
+  } else {
+    state.workflow[field] = value;
+  }
+  markDirty();
+  renderWorkflowTab();
+}
+
+function updateGate(field, value) {
+  state.workflow.gate[field] = value;
+  markDirty();
+  renderWorkflowTab();
+}
+
+function addParam() {
+  state.workflow.params.push({ name: '', description: '', required: false, default: '' });
+  state.ui.openSections.add('params');
+  markDirty();
+  renderWorkflowTab();
+}
+function removeParam(i) {
+  state.workflow.params.splice(i, 1);
+  markDirty();
+  renderWorkflowTab();
+}
+function updateParam(i, field, value) {
+  state.workflow.params[i][field] = value;
+  markDirty();
+  renderWorkflowTab();
+}
+
+function addTool() {
+  state.workflow.tools.push({ name: '', type: 'script', command: '', description: '', required: true, input_schema: '', expected_tools: '', server_config: '' });
+  state.ui.openSections.add('tools');
+  markDirty();
+  renderWorkflowTab();
+}
+function removeTool(i) {
+  state.workflow.tools.splice(i, 1);
+  markDirty();
+  renderWorkflowTab();
+}
+function updateTool(i, field, value) {
+  state.workflow.tools[i][field] = value;
+  markDirty();
+  renderWorkflowTab();
+}
+function fillSchemaTemplate(i) {
+  const template = JSON.stringify({
+    type: 'object',
+    required: [],
+    properties: {
+      arg_name: { type: 'string', description: 'Describe this argument' }
+    }
+  }, null, 2);
+  state.workflow.tools[i].input_schema = template;
+  markDirty();
+  renderWorkflowTab();
+}
+
+function addStep() {
+  const idx = state.workflow.steps.length;
+  state.workflow.steps.push({
+    name: '', goal: '', subagent: true, spec_check: true,
+    model: '',
+    tools: '',
+    carry_forward: null,
+    parallel: false, parallel_key: '',
+    delegate_to: '', delegate_params: {},
+    param_bindings: {},
+    inputs: [], outputs: [], gate: null
+  });
+  state.ui.openSteps.add(idx);
+  markDirty();
+  renderWorkflowTab();
+}
+function removeStep(i) {
+  if (!confirm(`Delete step "${state.workflow.steps[i].name || 'Untitled'}"?`)) return;
+  state.workflow.steps.splice(i, 1);
+  // Fix open steps indices
+  const newOpen = new Set();
+  state.ui.openSteps.forEach(idx => {
+    if (idx < i) newOpen.add(idx);
+    else if (idx > i) newOpen.add(idx - 1);
+  });
+  state.ui.openSteps = newOpen;
+  markDirty();
+  renderWorkflowTab();
+}
+function moveStep(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= state.workflow.steps.length) return;
+  const steps = state.workflow.steps;
+  [steps[i], steps[j]] = [steps[j], steps[i]];
+  // Fix open indices
+  const newOpen = new Set();
+  state.ui.openSteps.forEach(idx => {
+    if (idx === i) newOpen.add(j);
+    else if (idx === j) newOpen.add(i);
+    else newOpen.add(idx);
+  });
+  state.ui.openSteps = newOpen;
+  markDirty();
+  renderWorkflowTab();
+}
+function updateStep(i, field, value) {
+  state.workflow.steps[i][field] = value;
+  markDirty();
+  renderWorkflowTab();
+}
+
+function toggleStepGate(i, enabled) {
+  if (enabled) {
+    const g = state.workflow.gate;
+    state.workflow.steps[i].gate = {
+      structural: g.structural,
+      semantic: g.semantic,
+      human: g.human
+    };
+  } else {
+    state.workflow.steps[i].gate = null;
+  }
+  markDirty();
+  renderWorkflowTab();
+}
+function updateStepGate(i, field, value) {
+  if (!state.workflow.steps[i].gate) state.workflow.steps[i].gate = {};
+  if (value == null) {
+    delete state.workflow.steps[i].gate[field];
+  } else {
+    state.workflow.steps[i].gate[field] = value;
+  }
+  markDirty();
+  renderWorkflowTab();
+}
+
+function addInput(si) {
+  state.workflow.steps[si].inputs.push({ path: '', inject: 'file', struct: '' });
+  markDirty();
+  renderWorkflowTab();
+}
+function removeInput(si, ii) {
+  state.workflow.steps[si].inputs.splice(ii, 1);
+  markDirty();
+  renderWorkflowTab();
+}
+function updateInput(si, ii, field, value) {
+  state.workflow.steps[si].inputs[ii][field] = value;
+  markDirty();
+  schedulePreview();
+}
+function addOutput(si) {
+  state.workflow.steps[si].outputs.push({ path: '', struct: '' });
+  markDirty();
+  renderWorkflowTab();
+}
+function removeOutput(si, ii) {
+  state.workflow.steps[si].outputs.splice(ii, 1);
+  markDirty();
+  renderWorkflowTab();
+}
+function updateOutput(si, ii, field, value) {
+  state.workflow.steps[si].outputs[ii][field] = value;
+  markDirty();
+  schedulePreview();
+}
+
+function addDelegateParam(si) {
+  const key = 'param_' + (Object.keys(state.workflow.steps[si].delegate_params).length + 1);
+  state.workflow.steps[si].delegate_params[key] = '';
+  markDirty();
+  renderWorkflowTab();
+}
+function removeDelegateParam(si, key) {
+  delete state.workflow.steps[si].delegate_params[key];
+  markDirty();
+  renderWorkflowTab();
+}
+function updateDelegateParam(si, key, value) {
+  state.workflow.steps[si].delegate_params[key] = value;
+  markDirty();
+  schedulePreview();
+}
+function renameDelegateParam(si, oldKey, newKey) {
+  const params = state.workflow.steps[si].delegate_params;
+  const value = params[oldKey];
+  delete params[oldKey];
+  params[newKey] = value;
+  markDirty();
+  renderWorkflowTab();
+}
+
+// Step chip toggles (trace-viewer style)
+function toggleStepChip(i, field) {
+  state.workflow.steps[i][field] = !state.workflow.steps[i][field];
+  markDirty();
+  renderWorkflowTab();
+}
+
+function cycleCarryForward(i) {
+  const cur = state.workflow.steps[i].carry_forward;
+  // null → true → false → null
+  if (cur == null) state.workflow.steps[i].carry_forward = true;
+  else if (cur === true) state.workflow.steps[i].carry_forward = false;
+  else state.workflow.steps[i].carry_forward = null;
+  markDirty();
+  renderWorkflowTab();
+}
+
+function toggleGateChip(i, field) {
+  const s = state.workflow.steps[i];
+  if (!s.gate) s.gate = {};
+  const wfVal = state.workflow.gate[field] ?? false;
+  if (s.gate[field] != null) {
+    // Has override — toggle the override value, or clear if back to workflow default
+    const newVal = !s.gate[field];
+    if (newVal === wfVal) {
+      delete s.gate[field];
+      // Clean up empty gate object
+      if (Object.keys(s.gate).length === 0) s.gate = null;
+    } else {
+      s.gate[field] = newVal;
+    }
+  } else {
+    // No override — set override to opposite of workflow default
+    s.gate[field] = !wfVal;
+  }
+  state.workflow.steps[i] = s;
+  markDirty();
+  renderWorkflowTab();
+}
+
+function promptDelegation(i) {
+  const name = prompt('Workflow name to delegate to:');
+  if (name) {
+    state.workflow.steps[i].delegate_to = name;
+    markDirty();
+    renderWorkflowTab();
+  }
+}
+
+function clearStepGate(i) {
+  state.workflow.steps[i].gate = null;
+  markDirty();
+  renderWorkflowTab();
+}
+
+// Param bindings mutations
+function addParamBinding(si) {
+  if (!state.workflow.steps[si].param_bindings) state.workflow.steps[si].param_bindings = {};
+  const key = 'param_' + (Object.keys(state.workflow.steps[si].param_bindings).length + 1);
+  state.workflow.steps[si].param_bindings[key] = '';
+  markDirty();
+  renderWorkflowTab();
+}
+function removeParamBinding(si, key) {
+  delete state.workflow.steps[si].param_bindings[key];
+  markDirty();
+  renderWorkflowTab();
+}
+function updateParamBinding(si, key, value) {
+  state.workflow.steps[si].param_bindings[key] = value;
+  markDirty();
+  schedulePreview();
+}
+function renameParamBinding(si, oldKey, newKey) {
+  const bindings = state.workflow.steps[si].param_bindings;
+  const value = bindings[oldKey];
+  delete bindings[oldKey];
+  bindings[newKey] = value;
+  markDirty();
+  renderWorkflowTab();
+}
+
+// Struct mutations
+function addStruct(prefillName) {
+  const idx = state.structs.length;
+  state.structs.push({
+    name: prefillName || '',
+    description: '',
+    format: 'json',
+    required_fields: [],
+    frontmatter: [],
+    required_sections: [],
+    file_checks: { exists: true }
+  });
+  state.ui.openStructs.add(idx);
+  markDirty();
+  switchTab('structs');
+  renderStructsTab();
+  renderWorkflowTab(); // update struct dropdowns
+}
+function removeStruct(i) {
+  if (!confirm(`Delete schema "${state.structs[i].name || 'Untitled'}"?`)) return;
+  state.structs.splice(i, 1);
+  const newOpen = new Set();
+  state.ui.openStructs.forEach(idx => {
+    if (idx < i) newOpen.add(idx);
+    else if (idx > i) newOpen.add(idx - 1);
+  });
+  state.ui.openStructs = newOpen;
+  markDirty();
+  renderStructsTab();
+  renderWorkflowTab();
+}
+function updateStruct(i, field, value) {
+  state.structs[i][field] = value;
+  markDirty();
+  renderStructsTab();
+  if (field === 'name') renderWorkflowTab(); // update dropdowns
+}
+
+function addRequiredField(si) {
+  if (!state.structs[si].required_fields) state.structs[si].required_fields = [];
+  state.structs[si].required_fields.push({ field: '', type: 'string', pattern: '', enum_values: '', min_items: null });
+  markDirty();
+  renderStructsTab();
+}
+function removeRequiredField(si, fi) {
+  state.structs[si].required_fields.splice(fi, 1);
+  markDirty();
+  renderStructsTab();
+}
+function updateRequiredField(si, fi, field, value) {
+  state.structs[si].required_fields[fi][field] = value;
+  markDirty();
+  // Don't full re-render for simple text changes
+}
+
+function addFrontmatterField(si) {
+  if (!state.structs[si].frontmatter) state.structs[si].frontmatter = [];
+  state.structs[si].frontmatter.push({ field: '', type: 'string', pattern: '', values: '' });
+  markDirty();
+  renderStructsTab();
+}
+function removeFrontmatterField(si, fi) {
+  state.structs[si].frontmatter.splice(fi, 1);
+  markDirty();
+  renderStructsTab();
+}
+function updateFrontmatterField(si, fi, field, value) {
+  state.structs[si].frontmatter[fi][field] = value;
+  markDirty();
+  if (field === 'type') renderStructsTab(); // show/hide conditional fields
+}
+
+function addRequiredSection(si) {
+  if (!state.structs[si].required_sections) state.structs[si].required_sections = [];
+  state.structs[si].required_sections.push('');
+  markDirty();
+  renderStructsTab();
+}
+function removeRequiredSection(si, j) {
+  state.structs[si].required_sections.splice(j, 1);
+  markDirty();
+  renderStructsTab();
+}
+function updateRequiredSection(si, j, value) {
+  state.structs[si].required_sections[j] = value;
+  markDirty();
+}
+
+function updateFileCheck(si, field, value) {
+  if (!state.structs[si].file_checks) state.structs[si].file_checks = {};
+  if (value == null) {
+    delete state.structs[si].file_checks[field];
+  } else {
+    state.structs[si].file_checks[field] = value;
+  }
+  markDirty();
+}
+
+function handleStructSelect(select, stepIdx, itemIdx, type) {
+  const val = select.value;
+  if (val === '__new__') {
+    addStruct();
+    select.value = '';
+    return;
+  }
+  if (type === 'input') {
+    state.workflow.steps[stepIdx].inputs[itemIdx].struct = val;
+  } else {
+    state.workflow.steps[stepIdx].outputs[itemIdx].struct = val;
+  }
+  markDirty();
+  schedulePreview();
+}
+
+// ── UI toggles ─────────────────────────────────────────
+function toggleSection(name) {
+  if (state.ui.openSections.has(name)) state.ui.openSections.delete(name);
+  else state.ui.openSections.add(name);
+  const el = document.getElementById('sec-' + name);
+  if (el) el.classList.toggle('collapsed');
+}
+function toggleStep(i) {
+  if (state.ui.openSteps.has(i)) state.ui.openSteps.delete(i);
+  else state.ui.openSteps.add(i);
+  renderWorkflowTab();
+}
+function toggleStruct(i) {
+  if (state.ui.openStructs.has(i)) state.ui.openStructs.delete(i);
+  else state.ui.openStructs.add(i);
+  renderStructsTab();
+}
+
+function updateStructCount() {
+  document.getElementById('structCount').textContent = state.structs.length;
+}
+
+function validateField(input, field) {
+  input.classList.remove('error');
+  const val = input.value;
+  if (field === 'name' && val && !V.kebab(val)) {
+    input.classList.add('error');
+  }
+}
+
+// ── File I/O ───────────────────────────────────────────
+function newWorkflow() {
+  if (state.ui.dirty && !confirm('Discard unsaved changes?')) return;
+  state.workflow = {
+    name: '', version: 1, description: '',
+    params: [],
+    tools: [],
+    gate: { structural: true, semantic: false, human: false, max_step_retries: 3, max_gate_retries: 5 },
+    context: { carry_forward: 'none' },
+    steps: []
+  };
+  state.structs = [];
+  state.ui.openSteps = new Set();
+  state.ui.openStructs = new Set();
+  state.ui.dirty = false;
+  switchTab('workflow');
+  renderWorkflowTab();
+  renderStructsTab();
+}
+
+function loadFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = parseYAML(e.target.result);
+      loadWorkflowFromParsed(parsed);
+      autoDetectStructs();
+      state.ui.openSteps = new Set();
+      state.ui.openStructs = new Set();
+      state.ui.dirty = false;
+      renderWorkflowTab();
+      renderStructsTab();
+    } catch (err) {
+      alert('Error parsing YAML: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function handleFileInput(event) {
+  const file = event.target.files[0];
+  if (file) loadFile(file);
+  event.target.value = '';
+}
+
+function downloadFile(content, filename) {
+  const blob = new Blob([content], { type: 'text/yaml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportYAML() {
+  const errors = validateWorkflow();
+  if (errors.length > 0) {
+    alert('Validation errors:\n\n' + errors.join('\n'));
+    return;
+  }
+  const yaml = generateWorkflowYAML(state.workflow);
+  downloadFile(yaml, 'workflow.yaml');
+  state.ui.dirty = false;
+}
+
+function exportAll() {
+  const errors = validateWorkflow();
+  if (errors.length > 0) {
+    alert('Validation errors:\n\n' + errors.join('\n'));
+    return;
+  }
+  // Download workflow.yaml
+  downloadFile(generateWorkflowYAML(state.workflow), 'workflow.yaml');
+
+  // Download struct schemas with delay
+  state.structs.forEach((s, i) => {
+    if (!s.name) return;
+    setTimeout(() => {
+      downloadFile(generateStructYAML(s), s.name + '.schema.yaml');
+    }, (i + 1) * 300);
+  });
+
+  state.ui.dirty = false;
+}
+
+function copyYAML() {
+  const yaml = generateWorkflowYAML(state.workflow);
+  navigator.clipboard.writeText(yaml).then(() => {
+    const btn = document.querySelector('.header-actions .btn-sm:nth-child(3)');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = yaml;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    exportYAML();
+  }
+});
+
+// ── Unsaved changes warning ────────────────────────────
+window.addEventListener('beforeunload', e => {
+  if (state.ui.dirty) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// ── Init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderWorkflowTab();
+  renderStructsTab();
+});
+</script>
+</body>
+</html>

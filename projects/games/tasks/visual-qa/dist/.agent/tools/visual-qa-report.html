@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visual QA — Report Viewer</title>
+<style>
+:root {
+  --bg: #f4f6f9; --bg-card: #ffffff; --bg-hover: #eef0f5; --bg-section: #f8f9fb;
+  --text: #1c1f2e; --text-secondary: #6b7280; --text-muted: #9ca3af;
+  --border: #e2e6ec; --accent: #4a6fe8; --accent-light: #eaeffb;
+  --green: #2f9e5a; --green-bg: #edf7f2;
+  --red: #d94747;   --red-bg: #fdeaea;
+  --amber: #b87316; --amber-bg: #fef5e4;
+  --blue: #3878c2;  --blue-bg: #e8f0fb;
+  --purple: #7048c8;--purple-bg: #f0ebff;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 12px; --radius-sm: 7px; --radius-xs: 4px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06); --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] {
+  --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2128; --bg-section: #13181f;
+  --text: #e6edf3; --text-secondary: #8b949e; --text-muted: #6e7681;
+  --border: #30363d; --accent: #7090f4; --accent-light: #1a2340;
+  --green: #3fb870; --green-bg: #0d2618;
+  --red: #f07070;   --red-bg: #2d1010;
+  --amber: #d4a44a; --amber-bg: #2a1f0a;
+  --blue: #6fa8e0;  --blue-bg: #0e1e33;
+  --purple: #a07de8;--purple-bg: #1a1030;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); font-size: 14px; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+
+/* HEADER */
+.header { position: sticky; top: 0; z-index: 100; background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); }
+.header-left { display: flex; align-items: center; gap: 10px; }
+.logo { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.logo-icon { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; }
+.header-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); transition: background 0.15s, border-color 0.15s; text-decoration: none; }
+.btn:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { filter: brightness(1.1); background: var(--accent); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; }
+
+/* MAIN */
+.main { max-width: 960px; margin: 32px auto; padding: 0 24px 80px; }
+
+/* CARD */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+.card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg-section); display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 14px; font-weight: 600; }
+.card-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.card-body { padding: 20px; }
+
+/* SECTION LABEL */
+.section-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; margin-top: 18px; }
+.section-label:first-child { margin-top: 0; }
+
+/* DROP ZONE */
+.drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 24px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+.drop-zone-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+.drop-zone-text { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+.drop-zone-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.drop-zone input[type=file] { display: none; }
+
+/* PASTE AREA */
+.paste-area { margin-top: 12px; }
+.paste-area textarea { width: 100%; height: 100px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--mono); font-size: 12px; background: var(--bg-section); color: var(--text); resize: vertical; outline: none; }
+.paste-area textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,111,232,0.1); }
+
+/* STAT CARDS */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: var(--bg-section); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; text-align: center; }
+.stat-val { font-size: 28px; font-weight: 800; font-family: var(--mono); line-height: 1.2; }
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+.stat-val.sev-critical { color: var(--red); }
+.stat-val.sev-high { color: var(--amber); }
+.stat-val.sev-medium { color: var(--blue); }
+.stat-val.sev-low { color: var(--purple); }
+.stat-val.sev-info { color: var(--text-muted); }
+.stat-val.cat-I { color: var(--red); }
+.stat-val.cat-C { color: var(--amber); }
+.stat-val.cat-W { color: var(--purple); }
+
+/* FILTER BAR */
+.filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg); transition: all 0.15s; user-select: none; }
+.filter-chip:hover { background: var(--bg-hover); }
+.filter-chip.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 600; }
+.filter-chip .fc-count { font-family: var(--mono); font-size: 11px; font-weight: 700; opacity: 0.7; }
+.filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+/* FINDING CARD */
+.finding { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; overflow: hidden; transition: border-color 0.15s; }
+.finding:hover { border-color: var(--accent); }
+.finding-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; user-select: none; }
+.finding-header:hover { background: var(--bg-hover); }
+.finding-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; width: 14px; text-align: center; flex-shrink: 0; }
+.finding.open .finding-arrow { transform: rotate(90deg); }
+.finding-sev { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.finding-sev.sev-critical { background: var(--red); }
+.finding-sev.sev-high { background: var(--amber); }
+.finding-sev.sev-medium { background: var(--blue); }
+.finding-sev.sev-low { background: var(--purple); }
+.finding-sev.sev-info { background: var(--text-muted); }
+.finding-id { font-family: var(--mono); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.finding-rule { font-family: var(--mono); font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.finding-desc { font-size: 13px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finding-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.02em; }
+.finding-badge.cat-I { background: var(--red-bg); color: var(--red); }
+.finding-badge.cat-C { background: var(--amber-bg); color: var(--amber); }
+.finding-badge.cat-W { background: var(--purple-bg); color: var(--purple); }
+.finding-badge.vis-confirmed { background: var(--green-bg); color: var(--green); }
+.finding-badge.vis-unconfirmed { background: var(--bg-hover); color: var(--text-muted); }
+.finding-badge.fix-applied { background: var(--green-bg); color: var(--green); }
+.finding-badge.fix-skipped { background: var(--bg-hover); color: var(--text-muted); }
+.finding-badge.fix-proposed { background: var(--blue-bg); color: var(--blue); }
+
+.finding-body { display: none; padding: 0 14px 14px 36px; font-size: 13px; }
+.finding.open .finding-body { display: block; }
+.finding-row { display: flex; gap: 8px; margin-bottom: 6px; }
+.finding-row-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; min-width: 100px; flex-shrink: 0; }
+.finding-row-value { font-size: 13px; color: var(--text); word-break: break-word; }
+.finding-row-value code { font-family: var(--mono); font-size: 12px; background: var(--bg-section); padding: 1px 5px; border-radius: 3px; }
+.finding-fix { margin-top: 10px; padding: 10px 12px; background: var(--green-bg); border: 1px solid var(--green); border-radius: var(--radius-xs); }
+.finding-fix-title { font-size: 11px; font-weight: 700; color: var(--green); text-transform: uppercase; margin-bottom: 4px; }
+
+/* RULES SUMMARY */
+.rules-summary { display: flex; flex-wrap: wrap; gap: 4px; }
+.rs-chip { display: inline-block; padding: 2px 6px; border-radius: 3px; font-family: var(--mono); font-size: 11px; font-weight: 600; }
+.rs-chip.passed { background: var(--green-bg); color: var(--green); }
+.rs-chip.skipped { background: var(--bg-hover); color: var(--text-muted); }
+
+/* VISUAL FINDINGS */
+.visual-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+.empty-state-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+.empty-state-text { font-size: 15px; font-weight: 500; }
+.empty-state-hint { font-size: 12px; margin-top: 4px; }
+
+/* LOADED FILES */
+.loaded-files { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.loaded-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-xs); font-size: 12px; font-family: var(--mono); background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+.loaded-file.missing { background: var(--bg-hover); color: var(--text-muted); border-color: var(--border); }
+
+/* THEME TOGGLE */
+.theme-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 8px; cursor: pointer; font-size: 14px; color: var(--text-secondary); }
+.theme-btn:hover { background: var(--bg-hover); }
+
+/* NO FINDINGS */
+.no-findings { padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">
+      <div class="logo-icon">R</div>
+      <div>
+        <div>Visual QA Report</div>
+        <div class="header-sub">Analysis results viewer</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">&#9681;</button>
+    <button class="btn btn-sm" onclick="resetAll()">Clear</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- LOAD SECTION -->
+  <div id="loadSection">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Load Report Files</div>
+          <div class="card-sub">Drop or paste the JSON reports generated by the Visual QA workflow</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <div class="drop-zone-icon">&#128196;</div>
+          <div class="drop-zone-text">Drop report JSON files here</div>
+          <div class="drop-zone-hint">analysis-report.json, visual-report.json, fix-report.json</div>
+          <input type="file" id="fileInput" accept=".json" multiple />
+        </div>
+        <div class="paste-area">
+          <div class="section-label" style="margin-top:16px;">Or paste JSON</div>
+          <textarea id="pasteBox" placeholder='Paste analysis-report.json content here...'></textarea>
+          <button class="btn btn-sm" style="margin-top:8px;" onclick="loadFromPaste()">Load pasted JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORT SECTION (hidden until data loaded) -->
+  <div id="reportSection" style="display:none;">
+
+    <!-- Loaded files indicator -->
+    <div class="loaded-files" id="loadedFiles"></div>
+
+    <!-- Summary stats -->
+    <div class="stats-row" id="statsRow"></div>
+
+    <!-- Category breakdown -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Overview</div>
+        <div style="font-size:12px;color:var(--text-muted);" id="statusBadge"></div>
+      </div>
+      <div class="card-body">
+        <div class="stats-row" id="catStats"></div>
+        <div class="section-label">Rules passed</div>
+        <div class="rules-summary" id="rulesPassed"></div>
+        <div class="section-label">Rules skipped</div>
+        <div class="rules-summary" id="rulesSkipped"></div>
+      </div>
+    </div>
+
+    <!-- Findings -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Findings <span id="findingsCount" style="font-weight:400;color:var(--text-muted);font-size:12px;"></span></div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" onclick="expandAll()">Expand all</button>
+          <button class="btn btn-sm" onclick="collapseAll()">Collapse</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div class="filter-bar" id="filterBar"></div>
+        <div id="findingsList"></div>
+      </div>
+    </div>
+
+    <!-- Visual validation (conditional) -->
+    <div id="visualSection" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Visual Validation</div>
+        </div>
+        <div class="card-body" id="visualBody"></div>
+      </div>
+    </div>
+
+    <!-- Fix report (conditional) -->
+    <div id="fixSection" style="display:none;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Fixes</div>
+          <div style="font-size:12px;color:var(--text-muted);" id="fixSummary"></div>
+        </div>
+        <div class="card-body" id="fixBody"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let analysis = null;
+let visual = null;
+let fix = null;
+let filters = { severity: null, category: null };
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ─── THEME ──────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const d = document.documentElement;
+  d.setAttribute('data-theme', d.getAttribute('data-theme') === 'dark' ? '' : 'dark');
+}
+if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
+// ─── FILE LOADING ───────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+function handleFiles(files) {
+  Array.from(files).forEach(f => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        loadReport(JSON.parse(reader.result), f.name);
+      } catch (err) {
+        alert(`Failed to parse ${f.name}: ${err.message}`);
+      }
+    };
+    reader.readAsText(f);
+  });
+}
+
+function loadFromPaste() {
+  const txt = document.getElementById('pasteBox').value.trim();
+  if (!txt) return;
+  try {
+    loadReport(JSON.parse(txt), 'pasted');
+  } catch (err) {
+    alert(`Failed to parse JSON: ${err.message}`);
+  }
+}
+
+function loadReport(data, filename) {
+  // Auto-detect report type
+  if (data.findings && data.totalRulesChecked !== undefined) {
+    analysis = data;
+  } else if (data.screenshotsAnalyzed !== undefined) {
+    visual = data;
+  } else if (data.totalFixesProposed !== undefined) {
+    fix = data;
+  } else if (data.findings) {
+    // fallback — treat as analysis
+    analysis = data;
+  } else {
+    alert(`Could not identify report type for: ${filename}`);
+    return;
+  }
+  renderAll();
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────────────────
+function renderAll() {
+  if (!analysis) return;
+  document.getElementById('loadSection').style.display = 'none';
+  document.getElementById('reportSection').style.display = 'block';
+  renderLoadedFiles();
+  renderStats();
+  renderCategoryStats();
+  renderRulesSummary();
+  renderFilterBar();
+  renderFindings();
+  renderVisual();
+  renderFixes();
+}
+
+function renderLoadedFiles() {
+  const el = document.getElementById('loadedFiles');
+  const files = [
+    { name: 'analysis-report', loaded: !!analysis },
+    { name: 'visual-report', loaded: !!visual },
+    { name: 'fix-report', loaded: !!fix },
+  ];
+  el.innerHTML = files.map(f =>
+    `<div class="loaded-file ${f.loaded ? '' : 'missing'}">${f.loaded ? '&#10003;' : '&#8212;'} ${f.name}</div>`
+  ).join('');
+}
+
+function renderStats() {
+  const s = analysis.findingsBySeverity || {};
+  const stats = [
+    { val: analysis.totalFindings || 0, label: 'Total findings', cls: '' },
+    { val: s.critical || 0, label: 'Critical', cls: 'sev-critical' },
+    { val: s.high || 0, label: 'High', cls: 'sev-high' },
+    { val: s.medium || 0, label: 'Medium', cls: 'sev-medium' },
+    { val: s.low || 0, label: 'Low', cls: 'sev-low' },
+    { val: analysis.totalRulesChecked || 0, label: 'Rules checked', cls: '' },
+  ];
+  document.getElementById('statsRow').innerHTML = stats.map(s =>
+    `<div class="stat-card"><div class="stat-val ${s.cls}">${s.val}</div><div class="stat-label">${s.label}</div></div>`
+  ).join('');
+  document.getElementById('statusBadge').textContent = `Status: ${analysis.status || 'unknown'}`;
+}
+
+function renderCategoryStats() {
+  const c = analysis.findingsByCategory || {};
+  const stats = [
+    { val: c.integrity || 0, label: 'Integrity [I]', cls: 'cat-I' },
+    { val: c.consistency || 0, label: 'Consistency [C]', cls: 'cat-C' },
+    { val: c.convention || 0, label: 'Convention [W]', cls: 'cat-W' },
+  ];
+  document.getElementById('catStats').innerHTML = stats.map(s =>
+    `<div class="stat-card"><div class="stat-val ${s.cls}">${s.val}</div><div class="stat-label">${s.label}</div></div>`
+  ).join('');
+}
+
+function renderRulesSummary() {
+  const passed = analysis.rulesPassed || [];
+  const skipped = analysis.rulesSkipped || [];
+  document.getElementById('rulesPassed').innerHTML = passed.length
+    ? passed.map(r => `<span class="rs-chip passed">${esc(r)}</span>`).join('')
+    : '<span style="font-size:12px;color:var(--text-muted);">None</span>';
+  document.getElementById('rulesSkipped').innerHTML = skipped.length
+    ? skipped.map(r => `<span class="rs-chip skipped" title="${esc(r.reason || '')}">${esc(r.ruleId || r)}</span>`).join('')
+    : '<span style="font-size:12px;color:var(--text-muted);">None</span>';
+}
+
+// ─── FILTER BAR ─────────────────────────────────────────────────────────────
+function renderFilterBar() {
+  const findings = analysis.findings || [];
+  const sevCounts = {};
+  const catCounts = {};
+  findings.forEach(f => {
+    sevCounts[f.severity] = (sevCounts[f.severity] || 0) + 1;
+    catCounts[f.category] = (catCounts[f.category] || 0) + 1;
+  });
+
+  const sevOrder = ['critical','high','medium','low','info'];
+  const catOrder = ['integrity','consistency','convention'];
+  const catLabel = { integrity: 'Integrity [I]', consistency: 'Consistency [C]', convention: 'Convention [W]' };
+
+  let html = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Severity:</span>';
+  sevOrder.forEach(s => {
+    if (!sevCounts[s]) return;
+    const active = filters.severity === s ? ' active' : '';
+    html += `<div class="filter-chip${active}" onclick="toggleFilter('severity','${s}')">${s} <span class="fc-count">${sevCounts[s]}</span></div>`;
+  });
+  html += '<div class="filter-sep"></div>';
+  html += '<span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Category:</span>';
+  catOrder.forEach(c => {
+    if (!catCounts[c]) return;
+    const active = filters.category === c ? ' active' : '';
+    html += `<div class="filter-chip${active}" onclick="toggleFilter('category','${c}')">${catLabel[c] || c} <span class="fc-count">${catCounts[c]}</span></div>`;
+  });
+
+  document.getElementById('filterBar').innerHTML = html;
+}
+
+function toggleFilter(type, val) {
+  filters[type] = filters[type] === val ? null : val;
+  renderFilterBar();
+  renderFindings();
+}
+
+// ─── FINDINGS LIST ──────────────────────────────────────────────────────────
+function getVisualStatus(findingId) {
+  if (!visual) return null;
+  const confirmed = (visual.findingsConfirmed || []).find(f => f.findingId === findingId);
+  if (confirmed) return { type: 'confirmed', confidence: confirmed.confidence, notes: confirmed.notes };
+  const unconfirmed = (visual.findingsUnconfirmed || []).find(f => f.findingId === findingId);
+  if (unconfirmed) return { type: 'unconfirmed', reason: unconfirmed.reason };
+  return null;
+}
+
+function getFixStatus(findingId) {
+  if (!fix) return null;
+  return (fix.fixes || []).find(f => f.findingId === findingId) || null;
+}
+
+function catTag(category) {
+  const map = { integrity: 'I', consistency: 'C', convention: 'W' };
+  return map[category] || '?';
+}
+
+function renderFindings() {
+  const findings = (analysis.findings || []).filter(f => {
+    if (filters.severity && f.severity !== filters.severity) return false;
+    if (filters.category && f.category !== filters.category) return false;
+    return true;
+  });
+
+  document.getElementById('findingsCount').textContent = `(${findings.length})`;
+
+  if (!findings.length) {
+    document.getElementById('findingsList').innerHTML = '<div class="no-findings">No findings match the current filters</div>';
+    return;
+  }
+
+  document.getElementById('findingsList').innerHTML = findings.map(f => {
+    const vs = getVisualStatus(f.id);
+    const fs = getFixStatus(f.id);
+    const cat = catTag(f.category);
+
+    let badges = `<span class="finding-badge cat-${cat}">${cat}</span>`;
+    if (vs) badges += ` <span class="finding-badge vis-${vs.type}">${vs.type === 'confirmed' ? 'Vis &#10003;' : 'Vis ?'}</span>`;
+    if (fs) {
+      const fsCls = fs.status === 'applied' || fs.status === 'user_approved' ? 'fix-applied'
+                  : fs.status === 'skipped' ? 'fix-skipped' : 'fix-proposed';
+      badges += ` <span class="finding-badge ${fsCls}">Fix: ${fs.status}</span>`;
+    }
+
+    let body = '';
+    body += row('File', `<code>${esc(f.file)}</code>`);
+    if (f.element) body += row('Element', `<code>${esc(f.element)}</code>`);
+    if (f.property) body += row('Property', `<code>${esc(f.property)}</code>`);
+    if (f.actualValue) body += row('Actual', `<code>${esc(f.actualValue)}</code>`);
+    if (f.expectedValue) body += row('Expected', `<code>${esc(f.expectedValue)}</code>`);
+    body += row('Severity', f.severity);
+    body += row('Description', esc(f.description));
+
+    if (vs && vs.type === 'confirmed') {
+      body += row('Visual', `Confirmed (${vs.confidence || '?'} confidence)${vs.notes ? ' — ' + esc(vs.notes) : ''}`);
+    } else if (vs && vs.type === 'unconfirmed') {
+      body += row('Visual', `Unconfirmed — ${esc(vs.reason || '')}`);
+    }
+
+    if (f.suggestedFix) {
+      body += `<div class="finding-fix">
+        <div class="finding-fix-title">Suggested fix</div>
+        ${row('File', `<code>${esc(f.suggestedFix.file || f.file)}</code>`)}
+        ${f.suggestedFix.jsonPath ? row('Path', `<code>${esc(f.suggestedFix.jsonPath)}</code>`) : ''}
+        ${f.suggestedFix.newValue ? row('New value', `<code>${esc(f.suggestedFix.newValue)}</code>`) : ''}
+      </div>`;
+    }
+
+    if (fs && fs.change) {
+      body += `<div class="finding-fix" style="margin-top:8px;">
+        <div class="finding-fix-title">Applied change (${fs.status})</div>
+        ${row('Path', `<code>${esc(fs.change.jsonPath)}</code>`)}
+        ${row('Old', `<code>${esc(fs.change.oldValue)}</code>`)}
+        ${row('New', `<code>${esc(fs.change.newValue)}</code>`)}
+      </div>`;
+    }
+
+    return `<div class="finding" data-id="${esc(f.id)}">
+      <div class="finding-header" onclick="toggleFinding(this)">
+        <span class="finding-arrow">&#9654;</span>
+        <span class="finding-sev sev-${f.severity}"></span>
+        <span class="finding-id">${esc(f.id)}</span>
+        <span class="finding-rule">${esc(f.ruleId)}${f.ruleName ? ' — ' + esc(f.ruleName) : ''}</span>
+        <span class="finding-desc">${esc(f.description)}</span>
+        ${badges}
+      </div>
+      <div class="finding-body">${body}</div>
+    </div>`;
+  }).join('');
+}
+
+function row(label, value) {
+  return `<div class="finding-row"><div class="finding-row-label">${label}</div><div class="finding-row-value">${value}</div></div>`;
+}
+
+function toggleFinding(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+function expandAll() {
+  document.querySelectorAll('.finding').forEach(f => f.classList.add('open'));
+}
+function collapseAll() {
+  document.querySelectorAll('.finding').forEach(f => f.classList.remove('open'));
+}
+
+// ─── VISUAL SECTION ─────────────────────────────────────────────────────────
+function renderVisual() {
+  if (!visual) { document.getElementById('visualSection').style.display = 'none'; return; }
+  document.getElementById('visualSection').style.display = 'block';
+
+  let html = '';
+  if (visual.status === 'skipped') {
+    html = '<div class="no-findings">No screenshots were provided — visual validation skipped</div>';
+  } else {
+    const ruleChecks = visual.visualRuleChecks || [];
+    const rulePass = ruleChecks.filter(r => r.result === 'pass').length;
+    const ruleFail = ruleChecks.filter(r => r.result === 'fail').length;
+    const ruleInc = ruleChecks.filter(r => r.result === 'inconclusive').length;
+
+    html += `<div class="stats-row" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-val">${visual.screenshotsAnalyzed}</div><div class="stat-label">Screenshots</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--green);">${(visual.findingsConfirmed || []).length}</div><div class="stat-label">Confirmed</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--text-muted);">${(visual.findingsUnconfirmed || []).length}</div><div class="stat-label">Unconfirmed</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--blue);">${ruleChecks.length}</div><div class="stat-label">Visual checks</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--amber);">${(visual.additionalFindings || []).length}</div><div class="stat-label">Additional</div></div>
+    </div>`;
+
+    // Visual rule checks (Part B)
+    if (ruleChecks.length) {
+      html += '<div class="section-label">Independent visual rule checks</div>';
+      html += `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+        <span style="color:var(--green);font-weight:600;">${rulePass} pass</span> &middot;
+        <span style="color:var(--red);font-weight:600;">${ruleFail} fail</span> &middot;
+        <span style="color:var(--text-muted);font-weight:600;">${ruleInc} inconclusive</span>
+      </div>`;
+      html += ruleChecks.map(r => {
+        const resColor = r.result === 'pass' ? 'var(--green)' : r.result === 'fail' ? 'var(--red)' : 'var(--text-muted)';
+        const resBg = r.result === 'pass' ? 'var(--green-bg)' : r.result === 'fail' ? 'var(--red-bg)' : 'var(--bg-hover)';
+        return `<div class="finding">
+          <div class="finding-header" onclick="toggleFinding(this)">
+            <span class="finding-arrow">&#9654;</span>
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${resColor};flex-shrink:0;"></span>
+            <span class="finding-id">${esc(r.ruleId)}</span>
+            <span class="finding-desc">${esc(r.description)}</span>
+            <span class="finding-badge" style="background:${resBg};color:${resColor};">${r.result}</span>
+            <span class="finding-badge" style="background:var(--bg-hover);color:var(--text-muted);">${r.confidence || '?'}</span>
+            ${r.comparedWithReference ? '<span class="finding-badge" style="background:var(--blue-bg);color:var(--blue);">ref</span>' : ''}
+          </div>
+          <div class="finding-body">
+            ${row('Result', `<span style="color:${resColor};font-weight:600;">${r.result}</span>`)}
+            ${row('Confidence', r.confidence || '?')}
+            ${row('Description', esc(r.description))}
+            ${r.comparedWithReference ? row('Reference', esc(r.referenceNotes || 'Compared with reference screenshot')) : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Additional findings
+    const additional = visual.additionalFindings || [];
+    if (additional.length) {
+      html += '<div class="section-label" style="margin-top:16px;">Additional visual findings</div>';
+      html += additional.map(f => `<div class="finding">
+        <div class="finding-header" onclick="toggleFinding(this)">
+          <span class="finding-arrow">&#9654;</span>
+          <span class="finding-sev sev-${f.severity || 'medium'}"></span>
+          <span class="finding-id">${esc(f.id)}</span>
+          <span class="finding-desc">${esc(f.description)}</span>
+        </div>
+        <div class="finding-body">
+          ${f.location ? row('Location', esc(f.location)) : ''}
+          ${f.severity ? row('Severity', f.severity) : ''}
+          ${f.possibleCause ? row('Possible cause', esc(f.possibleCause)) : ''}
+        </div>
+      </div>`).join('');
+    }
+
+    // Limitations
+    const limitations = visual.visionLimitations || [];
+    if (limitations.length) {
+      html += '<div class="section-label" style="margin-top:16px;">Vision limitations</div>';
+      html += '<ul style="margin-left:16px;font-size:13px;color:var(--text-secondary);">';
+      html += limitations.map(l => `<li>${esc(l)}</li>`).join('');
+      html += '</ul>';
+    }
+  }
+
+  document.getElementById('visualBody').innerHTML = html;
+}
+
+// ─── FIX SECTION ────────────────────────────────────────────────────────────
+function renderFixes() {
+  if (!fix) { document.getElementById('fixSection').style.display = 'none'; return; }
+  document.getElementById('fixSection').style.display = 'block';
+
+  document.getElementById('fixSummary').textContent =
+    `${fix.totalFixesApplied || 0} applied / ${fix.totalFixesProposed || 0} proposed / ${fix.totalFixesSkipped || 0} skipped`;
+
+  let html = `<div class="stats-row" style="margin-bottom:16px;">
+    <div class="stat-card"><div class="stat-val">${fix.totalFixesProposed || 0}</div><div class="stat-label">Proposed</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--green);">${fix.totalFixesApplied || 0}</div><div class="stat-label">Applied</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--text-muted);">${fix.totalFixesSkipped || 0}</div><div class="stat-label">Skipped</div></div>
+  </div>`;
+
+  const modified = fix.filesModified || [];
+  if (modified.length) {
+    html += '<div class="section-label">Files modified</div>';
+    html += '<div style="margin-bottom:16px;">' + modified.map(f =>
+      `<div style="font-family:var(--mono);font-size:12px;padding:2px 0;color:var(--green);">&#10003; ${esc(f)}</div>`
+    ).join('') + '</div>';
+  }
+
+  document.getElementById('fixBody').innerHTML = html;
+}
+
+// ─── RESET ──────────────────────────────────────────────────────────────────
+function resetAll() {
+  analysis = null; visual = null; fix = null;
+  filters = { severity: null, category: null };
+  document.getElementById('loadSection').style.display = 'block';
+  document.getElementById('reportSection').style.display = 'none';
+  document.getElementById('pasteBox').value = '';
+  document.getElementById('fileInput').value = '';
+}
+</script>
+</body>
+</html>

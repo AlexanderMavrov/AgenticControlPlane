@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "workflow_engine": {
+      "type": "stdio",
+      "command": "python",
+      "args": [".agent/mcp/workflow-engine.py"]
+    },
+    "workflow_tools": {
+      "type": "stdio",
+      "command": "python",
+      "args": [".agent/mcp/workflow-tools-loader.py"]
+    }
+  }
+}

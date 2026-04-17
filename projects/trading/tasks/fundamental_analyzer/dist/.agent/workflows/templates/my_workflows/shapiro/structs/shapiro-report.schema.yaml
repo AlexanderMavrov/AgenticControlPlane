@@ -1,0 +1,16 @@
+name: shapiro-report
+description: >
+  Validates the output of the Shapiro Python data pipeline (shapiro.runner).
+  Contains COT percentiles, crowding direction, bias, upcoming events, and news failures
+  for each watchlist market.
+format: json
+
+json_schema:
+  required_fields:
+    - field: generated_at
+      type: string
+    - field: upcoming_events
+      type: array
+    - field: markets
+      type: object
+      min_items: 1

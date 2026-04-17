@@ -1,0 +1,16 @@
+name: analysis
+description: File analysis result from count_lines tool
+type: object
+required:
+  - file
+  - line_count
+fields:
+  file:
+    type: string
+    description: Path to analyzed file
+  line_count:
+    type: number
+    description: Number of lines
+  char_count:
+    type: number
+    description: Number of characters

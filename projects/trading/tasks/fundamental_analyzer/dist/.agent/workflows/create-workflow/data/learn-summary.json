@@ -1,0 +1,18 @@
+{
+  "status": "ready",
+  "docs_read": [
+    "overview.md",
+    "workflow-yaml.md",
+    "structs.md",
+    "manifest.md",
+    "spec-write-and-implement/workflow.yaml",
+    "spec-enforcement/workflow.yaml"
+  ],
+  "capabilities_understood": [
+    "workflow.yaml format: top-level fields (name, version, description, params, gate, context, tools, steps) and step fields (name, goal, subagent, spec_check, tools, model, parallel, parallel_key, inputs, outputs, param_bindings, carry_forward, gate, delegate_to)",
+    "Gate configuration: structural (schema conformance), semantic (LLM quality check), human (manual approval) with max_gate_retries and max_step_retries for retry control",
+    "Input/output injection modes: file (inject full content, fail if missing), file_if_exists (inject if present, skip if not), reference (pass path only without reading); struct schemas validate I/O with standard JSON Schema or custom format styles",
+    "Parallel steps via parallel: true with shared parallel_key for concurrent execution; delegation via delegate_to for invoking sub-workflows with mapped params",
+    "Orchestrator execution flow: MCP tools (step_begin, step_complete, gate_evaluate) drive workflow progression; manifest.json tracks runtime state with per-step status, gate results, and summaries"
+  ]
+}

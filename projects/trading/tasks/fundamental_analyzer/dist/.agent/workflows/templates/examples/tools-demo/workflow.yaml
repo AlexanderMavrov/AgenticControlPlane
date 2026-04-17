@@ -1,0 +1,100 @@
+name: tools-demo
+version: 1
+description: >
+  Demo workflow: demonstrates both tool types (script + MCP).
+  Step 1 uses count_lines script tool to analyze a file.
+  Step 2 (inline) uses transform_json to enrich the data.
+  Step 3 uses demo_db MCP server to query related records and
+  produce a final report.
+
+tools:
+  - name: count_lines
+    type: script
+    command: "python .agent/scripts/count-lines.py"
+    description: "Count lines and characters in a file"
+    input_schema:
+      type: object
+      required: [file_path]
+      properties:
+        file_path:
+          type: string
+          description: "Path to the file to analyze"
+
+  - name: transform_json
+    type: script
+    command: "python .agent/scripts/transform-json.py"
+    description: "Transform JSON data: enrich with metadata or summarize"
+    input_schema:
+      type: object
+      required: [input]
+      properties:
+        input:
+          type: string
+          description: "Path to input JSON file"
+        operation:
+          type: string
+          description: "Operation: enrich (default) or summarize"
+
+  - name: demo_db
+    type: mcp
+    required: false
+    server_config:
+      command: "python"
+      args: [".agent/mcp/demo-db-server.py"]
+
+params:
+  - name: target
+    description: "File to analyze"
+    required: false
+    default: "README.md"
+
+gate:
+  structural: true
+  semantic: false
+  human: false
+
+context:
+  carry_forward: summary
+
+steps:
+  - name: analyze
+    tools: [count_lines]
+    goal: >
+      Use the count_lines tool to analyze {target}.
+      Write the result to the output file as JSON with fields:
+      file (string), line_count (number), char_count (number).
+    outputs:
+      - path: data/analysis.json
+        struct: analysis
+
+  - name: enrich
+    tools: [transform_json]
+    subagent: false
+    goal: >
+      Use transform_json tool with operation=enrich on the analysis file.
+      The tool adds _enriched and _field_count fields.
+      Write the enriched result to the output file.
+    inputs:
+      - path: data/analysis.json
+        inject: file
+    outputs:
+      - path: data/enriched.json
+        struct: enriched
+
+  - name: report
+    goal: >
+      Create a final report combining the enriched analysis data.
+      If demo_db MCP tools are available, use query_table to get
+      related records from the "projects" table. If not available,
+      set db_records to 0 and note "MCP server not available".
+
+      Write the report as JSON with fields:
+      status ("ok"), source (the target file path),
+      line_count (from analysis), db_records (count from DB or 0),
+      summary (brief text description).
+    inputs:
+      - path: data/enriched.json
+        inject: file
+    outputs:
+      - path: data/report.json
+        struct: report

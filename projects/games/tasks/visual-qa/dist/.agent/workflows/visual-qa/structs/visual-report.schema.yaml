@@ -1,0 +1,123 @@
+name: visual-report
+version: 2
+description: >
+  Results of LLM vision analysis on game screenshots.
+  Part A: confirms/denies static analysis findings.
+  Part B: independent visual rule checks and additional visual issues.
+type: object
+
+required:
+  - screenshotsAnalyzed
+  - status
+
+properties:
+  screenshotsAnalyzed:
+    type: integer
+    description: "Number of screenshots analyzed (0 if none provided)"
+
+  screenshotPaths:
+    type: object
+    properties:
+      idle: { type: string }
+      reference: { type: string }
+
+  findingsConfirmed:
+    type: array
+    description: "Finding IDs from analysis-report confirmed visually"
+    items:
+      type: object
+      properties:
+        findingId:
+          type: string
+          description: "ID from analysis-report (e.g. F001)"
+        confidence:
+          type: string
+          enum: [high, medium, low]
+        notes:
+          type: string
+          description: "What was observed on the screenshot"
+
+  findingsUnconfirmed:
+    type: array
+    description: "Finding IDs that could not be confirmed visually"
+    items:
+      type: object
+      properties:
+        findingId:
+          type: string
+        reason:
+          type: string
+          description: "Why it could not be confirmed (e.g. too subtle, outside visible area)"
+
+  visualRuleChecks:
+    type: array
+    description: "Independent visual checks of rules (Part B)"
+    items:
+      type: object
+      required: [ruleId, result, confidence, description]
+      properties:
+        ruleId:
+          type: string
+          description: "Rule ID checked visually (e.g. A6, N9, B1)"
+        result:
+          type: string
+          enum: [pass, fail, inconclusive]
+        confidence:
+          type: string
+          enum: [high, medium, low]
+        description:
+          type: string
+          description: "What was observed on the screenshot"
+        comparedWithReference:
+          type: boolean
+          description: "Whether reference screenshot was used for comparison"
+        referenceNotes:
+          type: string
+          description: "What differs from the reference (if compared)"
+
+  additionalFindings:
+    type: array
+    description: "Visual issues not caught by static analysis or rules (Part B.6)"
+    items:
+      type: object
+      required: [id, description, severity]
+      properties:
+        id:
+          type: string
+          description: "Visual finding ID (e.g. VF001)"
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+        location:
+          type: string
+          description: "Screen area where the issue was observed"
+        possibleCause:
+          type: string
+          description: "Possible root cause or file to investigate"
+
+  visionLimitations:
+    type: array
+    description: "Things that vision could not reliably check"
+    items: { type: string }
+
+  decisions:
+    type: array
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question: { type: string }
+        options_considered:
+          type: array
+          items: { type: string }
+        resolution: { type: string }
+        resolved_by:
+          type: string
+          enum: [agent, user]
+
+  status:
+    type: string
+    enum: [success, skipped, partial, failed]
+    description: "skipped if no screenshots were provided"

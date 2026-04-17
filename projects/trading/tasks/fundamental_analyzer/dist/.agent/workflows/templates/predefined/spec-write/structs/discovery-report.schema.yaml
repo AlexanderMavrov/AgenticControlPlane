@@ -1,0 +1,27 @@
+name: discovery-report
+description: >
+  Output of the DISCOVER step — analysis of existing specs,
+  overlaps, contradictions, and auto-discovery proposals.
+format: json
+
+json_schema:
+  required_fields:
+    - field: component
+      type: string
+    - field: spec_exists
+      type: boolean
+    - field: existing_spec_path
+      type: string
+    - field: overlapping_specs
+      type: array
+    - field: contradictions
+      type: array
+    - field: implemented_files
+      type: array
+  optional_fields:
+    - field: proposed_component
+      type: string
+      description: "Auto-discovery mode only — proposed component name when not provided by user"
+    - field: proposed_domain
+      type: string
+      description: "Auto-discovery mode only — proposed domain when not provided by user"

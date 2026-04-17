@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visual QA</title>
+<style>
+:root {
+  --bg: #f4f6f9; --bg-card: #ffffff; --bg-hover: #eef0f5; --bg-section: #f8f9fb;
+  --text: #1c1f2e; --text-secondary: #6b7280; --text-muted: #9ca3af;
+  --border: #e2e6ec; --accent: #4a6fe8; --accent-light: #eaeffb;
+  --green: #2f9e5a; --green-bg: #edf7f2;
+  --red: #d94747;   --red-bg: #fdeaea;
+  --amber: #b87316; --amber-bg: #fef5e4;
+  --blue: #3878c2;  --blue-bg: #e8f0fb;
+  --purple: #7048c8;--purple-bg: #f0ebff;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 12px; --radius-sm: 7px; --radius-xs: 4px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06); --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] {
+  --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2128; --bg-section: #13181f;
+  --text: #e6edf3; --text-secondary: #8b949e; --text-muted: #6e7681;
+  --border: #30363d; --accent: #7090f4; --accent-light: #1a2340;
+  --green: #3fb870; --green-bg: #0d2618;
+  --red: #f07070;   --red-bg: #2d1010;
+  --amber: #d4a44a; --amber-bg: #2a1f0a;
+  --blue: #6fa8e0;  --blue-bg: #0e1e33;
+  --purple: #a07de8;--purple-bg: #1a1030;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); font-size: 14px; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+
+/* HEADER */
+.header { position: sticky; top: 0; z-index: 100; background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); }
+.header-left { display: flex; align-items: center; gap: 10px; }
+.logo { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.logo-icon { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; }
+.header-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); transition: background 0.15s, border-color 0.15s; text-decoration: none; }
+.btn:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { filter: brightness(1.1); background: var(--accent); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; }
+.btn-danger { color: var(--red); border-color: var(--red-bg); }
+.btn-danger:hover { background: var(--red-bg); }
+
+/* MAIN */
+.main { max-width: 860px; margin: 32px auto; padding: 0 24px 80px; }
+
+/* WIZARD STEPS */
+.wizard-steps { display: flex; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
+.wstep { display: flex; align-items: center; gap: 8px; flex: 1; position: relative; cursor: pointer; }
+.wstep:not(:last-child)::after { content: ''; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 24px; height: 2px; background: var(--border); border-radius: 1px; }
+.wstep.done:not(:last-child)::after { background: var(--green); }
+.wstep-num { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; transition: all 0.2s; background: var(--bg); }
+.wstep.active .wstep-num { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.wstep.done .wstep-num { border-color: var(--green); color: #fff; background: var(--green); }
+.wstep-label { font-size: 12px; color: var(--text-muted); font-weight: 500; line-height: 1.2; }
+.wstep.active .wstep-label { color: var(--accent); font-weight: 600; }
+.wstep.done .wstep-label { color: var(--green); }
+
+/* CARD */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+.card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg-section); }
+.card-title { font-size: 14px; font-weight: 600; }
+.card-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.card-body { padding: 20px; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+/* SECTION LABEL */
+.section-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; margin-top: 18px; }
+.section-label:first-child { margin-top: 0; }
+
+/* FORM */
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+label .req { color: var(--red); margin-left: 2px; }
+input[type=text], input[type=number], select, textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font); font-size: 13px; background: var(--bg-card); color: var(--text); transition: border-color 0.15s, box-shadow 0.15s; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,111,232,0.1); }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(217,71,71,0.08); }
+select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+.field-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.field-error { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
+.field-error.visible { display: block; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* RESOLUTION CHIPS */
+.res-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.res-chip { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--bg); transition: border-color 0.15s, background 0.15s; user-select: none; }
+.res-chip:hover, .res-chip.selected { border-color: var(--accent); background: var(--accent-light); }
+.res-chip .rc-label { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+.res-chip .rc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.15s; }
+.res-chip.selected .rc-dot { background: var(--accent); }
+
+/* TOGGLE */
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.toggle { position: relative; width: 40px; height: 22px; background: var(--border); border-radius: 11px; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+.toggle.on { background: var(--accent); }
+.toggle-knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: left 0.2s; }
+.toggle.on .toggle-knob { left: 21px; }
+.toggle-label { font-size: 13px; font-weight: 500; }
+.toggle-hint { font-size: 11px; color: var(--text-muted); }
+
+/* SEVERITY CHIPS */
+.sev-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.sev-chip { padding: 5px 12px; border: 2px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; font-weight: 600; background: var(--bg); transition: all 0.15s; user-select: none; }
+.sev-chip:hover { border-color: var(--accent); }
+.sev-chip.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+.sev-critical { --sev-color: var(--red); }
+.sev-high { --sev-color: var(--amber); }
+.sev-medium { --sev-color: var(--blue); }
+.sev-low { --sev-color: var(--purple); }
+.sev-info { --sev-color: var(--text-muted); }
+.sev-chip.selected.sev-critical { border-color: var(--red); background: var(--red-bg); color: var(--red); }
+.sev-chip.selected.sev-high { border-color: var(--amber); background: var(--amber-bg); color: var(--amber); }
+.sev-chip.selected.sev-medium { border-color: var(--blue); background: var(--blue-bg); color: var(--blue); }
+.sev-chip.selected.sev-low { border-color: var(--purple); background: var(--purple-bg); color: var(--purple); }
+.sev-chip.selected.sev-info { border-color: var(--text-muted); background: var(--bg-hover); color: var(--text-secondary); }
+
+/* RULES REFERENCE */
+.rules-ref { margin-top: 8px; }
+.rules-group { margin-bottom: 12px; }
+.rules-group-header { font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+.rules-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.rule-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-xs); font-size: 11px; line-height: 1.4; border: 1px solid var(--border); background: var(--bg); cursor: default; }
+.rule-chip .rc-id { font-weight: 700; font-family: var(--mono); font-size: 10px; }
+.rule-chip .rc-desc { color: var(--text-secondary); }
+.rule-chip.cat-I { border-color: var(--red); background: var(--red-bg); }
+.rule-chip.cat-I .rc-id { color: var(--red); }
+.rule-chip.cat-C { border-color: var(--amber); background: var(--amber-bg); }
+.rule-chip.cat-C .rc-id { color: var(--amber); }
+.rule-chip.cat-W { border-color: var(--purple); background: var(--purple-bg); }
+.rule-chip.cat-W .rc-id { color: var(--purple); }
+
+/* INFO BOX */
+.info-box { border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; display: flex; gap: 8px; align-items: flex-start; margin-bottom: 14px; }
+.info-box.info { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue); }
+.info-box.warn { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+.info-box.success { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+.info-box .ib-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.info-box .ib-text { line-height: 1.5; }
+
+/* JSON PREVIEW */
+.json-preview { background: var(--bg-section); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6; max-height: 400px; overflow-y: auto; white-space: pre; color: var(--text); }
+.json-key { color: var(--accent); }
+.json-str { color: var(--green); }
+.json-num { color: var(--amber); }
+.json-bool { color: var(--purple); }
+.json-null { color: var(--text-muted); }
+
+/* SUMMARY TABLE */
+.summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.summary-table td { padding: 7px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.summary-table td:first-child { color: var(--text-secondary); font-weight: 600; width: 180px; }
+.summary-table .st-mono { font-family: var(--mono); }
+.st-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+
+/* NAV */
+.nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.nav-row .nav-right { display: flex; gap: 8px; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+@media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } .res-grid { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">
+      <div class="logo-icon">VQ</div>
+      <div>
+        <div>Visual QA</div>
+        <div class="header-sub">Alpha Family &middot; VLT Games</div>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-sm" onclick="resetWizard()">&#8634; Reset</button>
+    <button class="btn btn-sm btn-icon" onclick="toggleTheme()" id="themeBtn">&#127769;</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- WIZARD PROGRESS -->
+  <div class="wizard-steps">
+    <div class="wstep active" id="ws1" onclick="goStep(1)"><div class="wstep-num" id="wn1">1</div><div class="wstep-label">Game</div></div>
+    <div class="wstep" id="ws2" onclick="goStep(2)"><div class="wstep-num" id="wn2">2</div><div class="wstep-label">Resolution</div></div>
+    <div class="wstep" id="ws3" onclick="goStep(3)"><div class="wstep-num" id="wn3">3</div><div class="wstep-label">Screenshots</div></div>
+    <div class="wstep" id="ws4" onclick="goStep(4)"><div class="wstep-num" id="wn4">4</div><div class="wstep-label">Options</div></div>
+    <div class="wstep" id="ws5" onclick="goStep(5)"><div class="wstep-num" id="wn5">5</div><div class="wstep-label">Export</div></div>
+  </div>
+
+  <!-- ── STEP 1: GAME SELECTION ── -->
+  <div class="step-panel active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Step 1 &mdash; Game Selection</div>
+        <div class="card-sub">Path to the game resources directory</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Resources path <span class="req">*</span></label>
+          <input type="text" id="resourcesPath" placeholder="C:/Workspace/games/resources/burning_hot_coins" oninput="onResourcesPathChange()" />
+          <div class="field-hint">Full path to <code>resources/{game_name}/</code> directory</div>
+          <div class="field-error" id="pathErr">Path must not be empty</div>
+        </div>
+
+        <div id="gameNameBox" style="display:none;">
+          <div class="section-label">Detected game</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);" id="detectedGameName"></span>
+          </div>
+        </div>
+
+        <div class="nav-row">
+          <div></div>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(1)">Next &rarr;</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: RESOLUTION ── -->
+  <div class="step-panel" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Step 2 &mdash; Resolution</div>
+        <div class="card-sub">Choose the resolution to validate</div>
+      </div>
+      <div class="card-body">
+        <div class="section-label">Resolution</div>
+        <div class="res-grid" id="resGrid"></div>
+        <div class="field-hint" style="margin-top:8px;">The resolution determines which <code>v/{resolution}/</code> and <code>idata/{resolution}/</code> folders are read.</div>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(1)">&larr; Back</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(2)">Next &rarr;</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: SCREENSHOTS ── -->
+  <div class="step-panel" id="step3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Step 3 &mdash; Screenshots (optional)</div>
+        <div class="card-sub">Provide screenshots for visual validation (LLM vision analysis)</div>
+      </div>
+      <div class="card-body">
+        <div class="info-box info">
+          <span class="ib-icon">&#8505;</span>
+          <span class="ib-text">
+            Screenshots are <strong>optional</strong>. The primary analysis is static (JSON-based)
+            and works without screenshots. If provided, an LLM vision step will confirm/deny
+            findings and look for additional visual issues.
+          </span>
+        </div>
+
+        <div class="field">
+          <label>Idle state screenshot</label>
+          <input type="text" id="screenshotIdle" placeholder="C:/screenshots/game_idle.png" />
+          <div class="field-hint">Screenshot of the game in idle state (no spin, no win)</div>
+        </div>
+
+        <div class="field">
+          <label>Reference screenshot (from a correct game)</label>
+          <input type="text" id="screenshotRef" placeholder="C:/screenshots/reference_game_idle.png" />
+          <div class="field-hint">Optional &mdash; screenshot from a different, correctly working Alpha Family game for layout comparison</div>
+        </div>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(2)">&larr; Back</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(3)">Next &rarr;</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: OPTIONS ── -->
+  <div class="step-panel" id="step4">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Step 4 &mdash; Options</div>
+        <div class="card-sub">Configure severity, auto-fix, and rule filtering</div>
+      </div>
+      <div class="card-body">
+
+        <div class="section-label">Severity threshold</div>
+        <div class="field-hint" style="margin-bottom:8px;">Only findings at or above this severity will be reported</div>
+        <div class="sev-grid" id="sevGrid"></div>
+
+        <div class="section-label">Force gather</div>
+        <div class="toggle-row">
+          <div class="toggle" id="forceGatherToggle" onclick="toggleForceGather()">
+            <div class="toggle-knob"></div>
+          </div>
+          <div>
+            <div class="toggle-label">Rebuild game model</div>
+            <div class="toggle-hint">Re-read all resource files even if game-model-report.json already exists</div>
+          </div>
+        </div>
+
+        <div class="section-label">Auto-fix</div>
+        <div class="toggle-row">
+          <div class="toggle" id="autoFixToggle" onclick="toggleAutoFix()">
+            <div class="toggle-knob"></div>
+          </div>
+          <div>
+            <div class="toggle-label">Auto-apply fixes</div>
+            <div class="toggle-hint">When enabled, fixes are applied without asking for each one</div>
+          </div>
+        </div>
+
+        <div class="info-box warn" id="autoFixWarn" style="display:none;">
+          <span class="ib-icon">&#9888;</span>
+          <span class="ib-text">Auto-fix will modify game resource files directly. Make sure you have a backup or use version control.</span>
+        </div>
+
+        <div class="section-label">Rule filtering (optional)</div>
+        <div class="field">
+          <label>Skip rules</label>
+          <input type="text" id="skipRules" placeholder="A1, D1, W3" />
+          <div class="field-hint">Comma-separated rule IDs to skip (e.g. <code>A1, D1</code>). Leave empty to check all.</div>
+        </div>
+        <div class="field">
+          <label>Only rules</label>
+          <input type="text" id="onlyRules" placeholder="C1, C2, I1, I2" />
+          <div class="field-hint">Check ONLY these rules. Overrides skip if set.</div>
+        </div>
+
+        <div class="section-label" style="margin-top:24px;">Rules reference</div>
+        <div class="field-hint" style="margin-bottom:6px;">
+          All <span id="rulesCount"></span> validation rules &mdash;
+          <span style="color:var(--red);font-weight:600;">[I]</span> integrity,
+          <span style="color:var(--amber);font-weight:600;">[C]</span> consistency,
+          <span style="color:var(--purple);font-weight:600;">[W]</span> convention
+        </div>
+        <div class="rules-ref" id="rulesRef"></div>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(3)">&larr; Back</button>
+          <div class="nav-right"><button class="btn btn-primary" onclick="validateAndNext(4)">Next &rarr;</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 5: EXPORT ── -->
+  <div class="step-panel" id="step5">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Step 5 &mdash; Review &amp; Export</div>
+        <div class="card-sub">Configuration is ready for the visual-qa workflow</div>
+      </div>
+      <div class="card-body">
+        <div class="section-label">Summary</div>
+        <table class="summary-table" id="summaryTable"></table>
+
+        <div class="section-label">Run command</div>
+        <div style="position:relative;">
+          <code id="runCommand" style="display:block;background:var(--bg-section);padding:14px 16px;border-radius:var(--radius-sm);font-family:var(--mono);font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-all;border:1px solid var(--border);color:var(--text);cursor:pointer;" onclick="copyCommand()" title="Click to copy"></code>
+          <button class="btn btn-sm btn-primary" onclick="copyCommand()" id="copyCommandBtn" style="position:absolute;top:8px;right:8px;">&#9112; Copy</button>
+        </div>
+
+        <div class="info-box success" style="margin-top:16px;">
+          <span class="ib-icon">&#10003;</span>
+          <span class="ib-text">Copy the command above and paste it in your AI assistant (Claude Code, Cursor, etc.).</span>
+        </div>
+
+        <details style="margin-top:16px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text-secondary);user-select:none;">Full JSON config (for reference)</summary>
+          <div style="margin-top:8px;">
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <button class="btn btn-sm" onclick="copyConfig()">&#9112; Copy JSON</button>
+              <button class="btn btn-sm" onclick="downloadConfig()">&#8595; Download</button>
+            </div>
+            <div class="json-preview" id="jsonPreview"></div>
+          </div>
+        </details>
+
+        <div class="nav-row">
+          <button class="btn" onclick="goStep(4)">&larr; Back</button>
+          <div class="nav-right"><button class="btn btn-sm" onclick="resetWizard()">New config</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const TOTAL_STEPS = 5;
+
+const RESOLUTIONS = [
+  { id: '1920x1080', label: '1920 x 1080', w: 1920, h: 1080 },
+  { id: '1440x900',  label: '1440 x 900',  w: 1440, h: 900  },
+];
+
+const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
+
+const RULES = [
+  // A — Game Background & Frame
+  { id:'A1', cat:'W', group:'A', groupName:'Background & Frame', desc:'Background alpha' },
+  { id:'A2', cat:'W', group:'A', groupName:'Background & Frame', desc:'Background color tint' },
+  { id:'A3', cat:'C', group:'A', groupName:'Background & Frame', desc:'Panel gap detection' },
+  { id:'A4', cat:'C', group:'A', groupName:'Background & Frame', desc:'Panel full width' },
+  { id:'A5', cat:'C', group:'A', groupName:'Background & Frame', desc:'18+ icon position' },
+  { id:'A6', cat:'I', group:'A', groupName:'Background & Frame', desc:'Regulatory elements not hidden' },
+  { id:'A7', cat:'C', group:'A', groupName:'Background & Frame', desc:'No unexpected rotation' },
+  // B — Knobs
+  { id:'B1', cat:'C', group:'B', groupName:'Knobs', desc:'Symmetric positions' },
+  { id:'B2', cat:'C', group:'B', groupName:'Knobs', desc:'Same rssKey' },
+  { id:'B3', cat:'C', group:'B', groupName:'Knobs', desc:'Within reel area' },
+  { id:'B4', cat:'C', group:'B', groupName:'Knobs', desc:'Expected alignment' },
+  // C — Credit Bar
+  { id:'C1', cat:'W', group:'C', groupName:'Credit Bar', desc:'No explicit color' },
+  { id:'C2', cat:'W', group:'C', groupName:'Credit Bar', desc:'Uniform scale' },
+  { id:'C3', cat:'C', group:'C', groupName:'Credit Bar', desc:'Min/max consistency' },
+  { id:'C4', cat:'C', group:'C', groupName:'Credit Bar', desc:'Position in bar zone' },
+  // D — Coins Bar
+  { id:'D1', cat:'W', group:'D', groupName:'Coins Bar', desc:'Pure white color' },
+  { id:'D2', cat:'C', group:'D', groupName:'Coins Bar', desc:'Consistency with credit bar' },
+  { id:'D3', cat:'C', group:'D', groupName:'Coins Bar', desc:'X position ordering' },
+  // E — Bet Bar
+  { id:'E1', cat:'I', group:'E', groupName:'Bet Bar', desc:'Minimal structure' },
+  { id:'E2', cat:'C', group:'E', groupName:'Bet Bar', desc:'Aligned with other bars' },
+  { id:'E3', cat:'C', group:'E', groupName:'Bet Bar', desc:'Button symmetry' },
+  { id:'E4', cat:'C', group:'E', groupName:'Bet Bar', desc:'Label x co-located with text' },
+  // F — Win Bar
+  { id:'F1', cat:'I', group:'F', groupName:'Win Bar', desc:'Dedicated win style' },
+  { id:'F2', cat:'C', group:'F', groupName:'Win Bar', desc:'Rightmost position' },
+  { id:'F3', cat:'I', group:'F', groupName:'Win Bar', desc:'Multiple rssKeys' },
+  // G — Status Line
+  { id:'G1', cat:'C', group:'G', groupName:'Status Line', desc:'Mid-status consistent position' },
+  { id:'G2', cat:'C', group:'G', groupName:'Status Line', desc:'Within status zone' },
+  { id:'G3', cat:'C', group:'G', groupName:'Status Line', desc:'Left/right correct sides' },
+  { id:'G4', cat:'C', group:'G', groupName:'Status Line', desc:'idata midPoint consistency' },
+  // H — Buttons
+  { id:'H1', cat:'I', group:'H', groupName:'Buttons', desc:'Requires 3 rssKeys' },
+  { id:'H2', cat:'C', group:'H', groupName:'Buttons', desc:'Button + frame co-located' },
+  { id:'H3', cat:'C', group:'H', groupName:'Buttons', desc:'Within button zone' },
+  { id:'H4', cat:'C', group:'H', groupName:'Buttons', desc:'Left/right distribution' },
+  { id:'H5', cat:'C', group:'H', groupName:'Buttons', desc:'No overlap' },
+  // I — Reel Grid
+  { id:'I1', cat:'I', group:'I', groupName:'Reel Grid', desc:'Symbol count matches math' },
+  { id:'I2', cat:'I', group:'I', groupName:'Reel Grid', desc:'Sequential symbol IDs' },
+  { id:'I3', cat:'I', group:'I', groupName:'Reel Grid', desc:'Valid symbol rssId' },
+  { id:'I4', cat:'I', group:'I', groupName:'Reel Grid', desc:'Dimensions match math' },
+  { id:'I5', cat:'C', group:'I', groupName:'Reel Grid', desc:'Reel step consistency' },
+  { id:'I6', cat:'C', group:'I', groupName:'Reel Grid', desc:'Fits within screen' },
+  // J — Win Figures & Lines
+  { id:'J1', cat:'I', group:'J', groupName:'Win Figures & Lines', desc:'Keys for all symbols' },
+  { id:'J2', cat:'I', group:'J', groupName:'Win Figures & Lines', desc:'RSS keys in animations' },
+  { id:'J3', cat:'I', group:'J', groupName:'Win Figures & Lines', desc:'Line count matches math' },
+  { id:'J4', cat:'I', group:'J', groupName:'Win Figures & Lines', desc:'All imageIds exist' },
+  { id:'J5', cat:'I', group:'J', groupName:'Win Figures & Lines', desc:'Win sounds for all symbols' },
+  { id:'J6', cat:'I', group:'J', groupName:'Win Figures & Lines', desc:'WinSquare RSS keys exist' },
+  // K — Gamble Round
+  { id:'K1', cat:'C', group:'K', groupName:'Gamble Round', desc:'Cards centered' },
+  { id:'K2', cat:'C', group:'K', groupName:'Gamble Round', desc:'History cards evenly spaced' },
+  { id:'K3', cat:'C', group:'K', groupName:'Gamble Round', desc:'Amount/to-win symmetric' },
+  { id:'K4', cat:'C', group:'K', groupName:'Gamble Round', desc:'Overlay full screen' },
+  // L — Wheel Round
+  { id:'L1', cat:'C', group:'L', groupName:'Wheel Round', desc:'Center alignment' },
+  { id:'L2', cat:'C', group:'L', groupName:'Wheel Round', desc:'Sector text consistency' },
+  { id:'L3', cat:'C', group:'L', groupName:'Wheel Round', desc:'Panel position' },
+  // M — Menus
+  { id:'M1', cat:'C', group:'M', groupName:'Menus', desc:'Language items evenly spaced' },
+  { id:'M2', cat:'C', group:'M', groupName:'Menus', desc:'Button/border/label aligned' },
+  { id:'M3', cat:'C', group:'M', groupName:'Menus', desc:'Bet menu button symmetry' },
+  // N — Cross-cutting
+  { id:'N1', cat:'I', group:'N', groupName:'Cross-cutting', desc:'rssKey references exist' },
+  { id:'N2', cat:'I', group:'N', groupName:'Cross-cutting', desc:'rssStyleId references exist' },
+  { id:'N3', cat:'I', group:'N', groupName:'Cross-cutting', desc:'No duplicate element IDs' },
+  { id:'N4', cat:'I', group:'N', groupName:'Cross-cutting', desc:'Type-required properties' },
+  { id:'N5', cat:'I', group:'N', groupName:'Cross-cutting', desc:'Resolution consistency' },
+  { id:'N9', cat:'C', group:'N', groupName:'Cross-cutting', desc:'Text fitBox minimum size' },
+  { id:'N6', cat:'C', group:'N', groupName:'Cross-cutting', desc:'Bar values alignment' },
+  { id:'N7', cat:'C', group:'N', groupName:'Cross-cutting', desc:'Bar labels alignment' },
+  { id:'N8', cat:'C', group:'N', groupName:'Cross-cutting', desc:'Bar x-ordering' },
+  // O — Touch Areas
+  { id:'O1', cat:'C', group:'O', groupName:'Touch Areas', desc:'Reel stop even spacing' },
+  { id:'O2', cat:'C', group:'O', groupName:'Touch Areas', desc:'Within screen bounds' },
+];
+
+const state = {
+  currentStep: 1,
+  maxReached: 1,
+  resourcesPath: '',
+  gameName: '',
+  resolution: '1920x1080',
+  screenWidth: 1920,
+  screenHeight: 1080,
+  screenshotIdle: '',
+  screenshotRef: '',
+  severityThreshold: 'low',
+  forceGather: false,
+  autoFix: false,
+  skipRules: [],
+  onlyRules: [],
+};
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  renderResGrid();
+  renderSevGrid();
+  renderRulesRef();
+  const saved = localStorage.getItem('vqa-theme');
+  if (saved === 'dark') applyTheme('dark');
+};
+
+// ─── THEME ───────────────────────────────────────────────────────────────────
+function toggleTheme() { applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); }
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t === 'dark' ? 'dark' : '';
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '\u2600' : '\uD83C\uDF19';
+  localStorage.setItem('vqa-theme', t);
+}
+
+// ─── STEP 1: GAME SELECTION ─────────────────────────────────────────────────
+function onResourcesPathChange() {
+  const val = document.getElementById('resourcesPath').value.trim();
+  state.resourcesPath = val;
+  // Auto-detect game name from last path segment
+  const segments = val.replace(/\\/g, '/').replace(/\/+$/, '').split('/');
+  const last = segments[segments.length - 1] || '';
+  state.gameName = last;
+  const box = document.getElementById('gameNameBox');
+  const nameEl = document.getElementById('detectedGameName');
+  if (last) {
+    box.style.display = 'block';
+    nameEl.textContent = last;
+  } else {
+    box.style.display = 'none';
+  }
+  // Clear error
+  document.getElementById('resourcesPath').classList.remove('error');
+  document.getElementById('pathErr').classList.remove('visible');
+}
+
+// ─── STEP 2: RESOLUTION ─────────────────────────────────────────────────────
+function renderResGrid() {
+  document.getElementById('resGrid').innerHTML = RESOLUTIONS.map(r => `
+    <div class="res-chip${state.resolution === r.id ? ' selected' : ''}" onclick="selectRes('${r.id}')">
+      <span class="rc-dot"></span>
+      <span class="rc-label">${r.label}</span>
+    </div>`).join('');
+}
+function selectRes(id) {
+  state.resolution = id;
+  const r = RESOLUTIONS.find(x => x.id === id);
+  state.screenWidth = r.w;
+  state.screenHeight = r.h;
+  renderResGrid();
+}
+
+// ─── STEP 4: OPTIONS ────────────────────────────────────────────────────────
+function renderSevGrid() {
+  document.getElementById('sevGrid').innerHTML = SEVERITIES.map(s => `
+    <div class="sev-chip sev-${s}${state.severityThreshold === s ? ' selected' : ''}" onclick="selectSev('${s}')">${s}</div>`).join('');
+}
+function selectSev(s) {
+  state.severityThreshold = s;
+  renderSevGrid();
+}
+
+function renderRulesRef() {
+  document.getElementById('rulesCount').textContent = RULES.length;
+  const groups = [];
+  let last = null;
+  RULES.forEach(r => {
+    if (r.group !== last) { groups.push({ key: r.group, name: r.groupName, rules: [] }); last = r.group; }
+    groups[groups.length - 1].rules.push(r);
+  });
+  document.getElementById('rulesRef').innerHTML = groups.map(g => `
+    <div class="rules-group">
+      <div class="rules-group-header">${g.key}. ${esc(g.name)}</div>
+      <div class="rules-chips">${g.rules.map(r => `<div class="rule-chip cat-${r.cat}" title="[${r.cat}] ${esc(r.desc)}"><span class="rc-id">${r.id}</span><span class="rc-desc">${esc(r.desc)}</span></div>`).join('')}</div>
+    </div>`).join('');
+}
+
+function toggleForceGather() {
+  state.forceGather = !state.forceGather;
+  document.getElementById('forceGatherToggle').classList.toggle('on', state.forceGather);
+}
+
+function toggleAutoFix() {
+  state.autoFix = !state.autoFix;
+  const el = document.getElementById('autoFixToggle');
+  el.classList.toggle('on', state.autoFix);
+  document.getElementById('autoFixWarn').style.display = state.autoFix ? 'flex' : 'none';
+}
+
+function parseRuleList(val) {
+  return val.split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-Z]\d+$/.test(s));
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function syncState() {
+  state.resourcesPath = document.getElementById('resourcesPath').value.trim();
+  state.screenshotIdle = document.getElementById('screenshotIdle').value.trim();
+  state.screenshotRef = document.getElementById('screenshotRef').value.trim();
+  state.skipRules = parseRuleList(document.getElementById('skipRules').value);
+  state.onlyRules = parseRuleList(document.getElementById('onlyRules').value);
+  // gameName re-derived
+  const segments = state.resourcesPath.replace(/\\/g, '/').replace(/\/+$/, '').split('/');
+  state.gameName = segments[segments.length - 1] || '';
+}
+
+function goStep(n) {
+  if (n > state.maxReached && n !== state.currentStep + 1) return;
+  syncState();
+  document.getElementById('step' + state.currentStep).classList.remove('active');
+  document.getElementById('ws' + state.currentStep).classList.remove('active');
+  state.currentStep = n;
+  if (n > state.maxReached) state.maxReached = n;
+  document.getElementById('step' + n).classList.add('active');
+  document.getElementById('ws' + n).classList.add('active');
+  updateWizardUI();
+  // Re-sync inputs
+  document.getElementById('resourcesPath').value = state.resourcesPath;
+  document.getElementById('screenshotIdle').value = state.screenshotIdle;
+  document.getElementById('screenshotRef').value = state.screenshotRef;
+  document.getElementById('skipRules').value = state.skipRules.join(', ');
+  document.getElementById('onlyRules').value = state.onlyRules.join(', ');
+  if (n === 5) renderExport();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateWizardUI() {
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const ws = document.getElementById('ws' + i), wn = document.getElementById('wn' + i);
+    ws.classList.remove('active', 'done');
+    if (i < state.currentStep) { ws.classList.add('done'); wn.textContent = '\u2713'; }
+    else if (i === state.currentStep) { ws.classList.add('active'); wn.textContent = i; }
+    else wn.textContent = i;
+  }
+}
+
+function validateAndNext(step) {
+  if (step === 1) {
+    const path = document.getElementById('resourcesPath').value.trim();
+    if (!path) {
+      document.getElementById('resourcesPath').classList.add('error');
+      document.getElementById('pathErr').classList.add('visible');
+      return;
+    }
+    state.resourcesPath = path;
+    onResourcesPathChange();
+    goStep(2);
+  } else if (step === 2) {
+    goStep(3);
+  } else if (step === 3) {
+    goStep(4);
+  } else if (step === 4) {
+    syncState();
+    goStep(5);
+  }
+}
+
+// ─── EXPORT ──────────────────────────────────────────────────────────────────
+function buildConfig() {
+  syncState();
+  const cfg = {
+    version: 1,
+    gameName: state.gameName,
+    resourcesPath: state.resourcesPath,
+    resolution: state.resolution,
+    screenWidth: state.screenWidth,
+    screenHeight: state.screenHeight,
+  };
+
+  // Screenshots (only if provided)
+  if (state.screenshotIdle || state.screenshotRef) {
+    cfg.screenshots = {};
+    if (state.screenshotIdle) cfg.screenshots.idle = state.screenshotIdle;
+    if (state.screenshotRef) cfg.screenshots.reference = state.screenshotRef;
+  }
+
+  // Options
+  cfg.options = {
+    autoFix: state.autoFix,
+    forceGather: state.forceGather,
+    severityThreshold: state.severityThreshold,
+  };
+  if (state.skipRules.length) cfg.options.skipRules = state.skipRules;
+  if (state.onlyRules.length) cfg.options.onlyRules = state.onlyRules;
+
+  return cfg;
+}
+
+function renderExport() {
+  const cfg = buildConfig();
+
+  // Screenshots summary
+  const hasIdle = !!state.screenshotIdle;
+  const hasRef = !!state.screenshotRef;
+  let screenSummary = 'None (static analysis only)';
+  if (hasIdle && hasRef) screenSummary = 'Idle + Reference';
+  else if (hasIdle) screenSummary = 'Idle only';
+  else if (hasRef) screenSummary = 'Reference only';
+
+  // Severity tag
+  const sevColors = {
+    critical: 'var(--red-bg);color:var(--red)',
+    high: 'var(--amber-bg);color:var(--amber)',
+    medium: 'var(--blue-bg);color:var(--blue)',
+    low: 'var(--purple-bg);color:var(--purple)',
+    info: 'var(--bg-hover);color:var(--text-secondary)'
+  };
+  const sevTag = `<span class="st-tag" style="background:${sevColors[state.severityThreshold]}">${state.severityThreshold}</span>`;
+
+  // Rules
+  const rulesInfo = state.onlyRules.length
+    ? `Only: <code>${esc(state.onlyRules.join(', '))}</code>`
+    : state.skipRules.length
+    ? `Skip: <code>${esc(state.skipRules.join(', '))}</code>`
+    : 'All rules';
+
+  document.getElementById('summaryTable').innerHTML = `
+    <tr><td>Game</td><td class="st-mono">${esc(state.gameName)}</td></tr>
+    <tr><td>Resources path</td><td class="st-mono" style="word-break:break-all;">${esc(state.resourcesPath)}</td></tr>
+    <tr><td>Resolution</td><td class="st-mono">${esc(state.resolution)}</td></tr>
+    <tr><td>Screenshots</td><td>${screenSummary}</td></tr>
+    <tr><td>Severity threshold</td><td>${sevTag}</td></tr>
+    <tr><td>Force gather</td><td>${state.forceGather
+      ? '<span class="st-tag" style="background:var(--blue-bg);color:var(--blue)">ON</span> (rebuild game model)'
+      : '<span style="color:var(--text-muted)">OFF</span> (use cached if available)'}</td></tr>
+    <tr><td>Auto-fix</td><td>${state.autoFix
+      ? '<span class="st-tag" style="background:var(--amber-bg);color:var(--amber)">ON</span>'
+      : '<span style="color:var(--text-muted)">OFF</span>'}</td></tr>
+    <tr><td>Rules</td><td>${rulesInfo}</td></tr>
+  `;
+  document.getElementById('jsonPreview').innerHTML = syntaxHighlight(JSON.stringify(cfg, null, 2));
+
+  // Build /run-workflow command
+  const configFile = `visual-qa-${state.gameName || 'config'}.json`;
+  const cmd = `/run-workflow visual-qa --config_path "${configFile}"`;
+  document.getElementById('runCommand').textContent = cmd;
+}
+
+function syntaxHighlight(json) {
+  return json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let cls = 'json-num';
+      if (/^"/.test(m)) cls = /:$/.test(m) ? 'json-key' : 'json-str';
+      else if (/true|false/.test(m)) cls = 'json-bool';
+      else if (/null/.test(m)) cls = 'json-null';
+      return `<span class="${cls}">${m}</span>`;
+    });
+}
+
+function downloadConfig() {
+  const json = JSON.stringify(buildConfig(), null, 2);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = `visual-qa-${state.gameName || 'config'}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function copyConfig() {
+  navigator.clipboard.writeText(JSON.stringify(buildConfig(), null, 2)).then(() => {
+    const btn = document.querySelector('[onclick="copyConfig()"]');
+    const orig = btn.innerHTML;
+    btn.textContent = '\u2713 Copied';
+    setTimeout(() => btn.innerHTML = orig, 1500);
+  });
+}
+
+function copyCommand() {
+  const cmd = document.getElementById('runCommand').textContent;
+  navigator.clipboard.writeText(cmd).then(() => {
+    const btn = document.getElementById('copyCommandBtn');
+    const orig = btn.innerHTML;
+    btn.textContent = '\u2713 Copied';
+    setTimeout(() => btn.innerHTML = orig, 1500);
+  });
+}
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+function resetWizard() {
+  if (!confirm('Clear all data and start over?')) return;
+  Object.assign(state, {
+    currentStep: 1, maxReached: 1,
+    resourcesPath: '', gameName: '',
+    resolution: '1920x1080', screenWidth: 1920, screenHeight: 1080,
+    screenshotIdle: '', screenshotRef: '',
+    severityThreshold: 'low', forceGather: false, autoFix: false,
+    skipRules: [], onlyRules: [],
+  });
+  ['resourcesPath', 'screenshotIdle', 'screenshotRef', 'skipRules', 'onlyRules']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('gameNameBox').style.display = 'none';
+  document.getElementById('forceGatherToggle').classList.remove('on');
+  document.getElementById('autoFixToggle').classList.remove('on');
+  document.getElementById('autoFixWarn').style.display = 'none';
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step1').classList.add('active');
+  renderResGrid();
+  renderSevGrid();
+  updateWizardUI();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+</script>
+</body>
+</html>

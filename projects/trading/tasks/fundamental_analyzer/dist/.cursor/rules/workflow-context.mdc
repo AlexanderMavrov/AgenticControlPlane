@@ -1,0 +1,36 @@
+---
+globs:
+  - ".agent/workflows/**/*"
+  - ".agent/specs/**/*"
+description: "Agentic Control Plane context — apply when working with workflows, specs, structs, or manifest files"
+---
+
+# Agentic Control Plane Context
+
+You are working with Agentic Control Plane files (Workflow Engine + Spec Guard).
+
+Documentation is at `.agent/docs/` — read it if you need format reference.
+
+## Workflow Engine Conventions
+
+- `workflow.yaml` defines steps, inputs, outputs, and gate config
+- Struct schemas in `structs/` define expected I/O formats
+- `manifest.json` is auto-generated — **never edit it manually**
+- `context/` contains auto-generated step summaries — **never edit manually**
+- Use `/run-workflow` to execute a workflow
+- Use `/learn-workflows` to learn the format before creating new workflows
+- Predefined workflows live in `.agent/workflows/templates/predefined/` — **do not modify** (engine distribution)
+- User workflows live in `.agent/workflows/templates/my_workflows/`
+
+## Spec Guard Conventions
+
+- Behavioral specs live in `.agent/specs/{domain}/ComponentName.md`
+- Each spec has YAML frontmatter (`spec_id`, `component`, `domain`, `status`) + Markdown body
+- `_index.json` tracks all specs metadata
+- `_registry.json` maps specs to implementation files
+- Use `/spec` to view specs (list, show)
+- Use `/spec-with-workflows` to create or audit specs via workflow engine (add, audit)
+- `[spec::ComponentName]` in chat triggers the full spec pipeline via `/run-workflow spec-write-and-implement`
+- `[spec]` (without component) triggers auto-discovery via `/run-workflow spec-write-and-implement`
+- `/spec-with-workflows add` delegates to the `spec-write` workflow (spec only, no implementation)
+- Spec format reference: `.agent/docs/specs.md`

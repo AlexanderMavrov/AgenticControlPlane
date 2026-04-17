@@ -1,0 +1,182 @@
+name: create-workflow
+version: 1
+description: >
+  Interactive workflow creation assistant. Guides the user through designing
+  a custom workflow by first learning the engine documentation, then discussing
+  requirements, and finally generating the workflow definition files.
+
+params:
+  - name: workflow_name
+    description: >
+      Name for the new workflow (kebab-case, e.g., "code-review", "data-migration").
+      If not provided, will be determined during the DISCUSS step.
+    required: false
+
+  - name: description
+    description: >
+      Brief description of what the workflow should do.
+      If not provided, will be refined during the DISCUSS step.
+    required: false
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+
+steps:
+  # ──────────────────────────────────────────────
+  # Step 1: LEARN
+  # Read all engine documentation to understand
+  # how workflows are defined and configured.
+  # ──────────────────────────────────────────────
+  - name: learn
+    spec_check: false
+    goal: >
+      Read and internalize the Workflow Engine documentation to prepare for
+      helping the user create a new workflow.
+
+      Read these files in order:
+      1. .agent/docs/overview.md — system overview, key concepts, file structure
+      2. .agent/docs/workflow-yaml.md — workflow.yaml format, all fields, examples
+      3. .agent/docs/structs.md — struct schema format, validation
+      4. .agent/docs/manifest.md — runtime state format (for understanding)
+
+      Also read existing workflows for reference patterns:
+      5. .agent/workflows/templates/predefined/spec-write-and-implement/workflow.yaml
+      6. .agent/workflows/templates/predefined/spec-enforcement/workflow.yaml
+
+      After reading, produce a brief summary confirming you understand:
+      - The workflow.yaml format (top-level fields, step fields, params)
+      - Gate configuration (structural, semantic, human)
+      - Input/output injection modes (file, file_if_exists, reference)
+      - Struct schemas for validation
+      - Parallel steps and delegation
+      - How the orchestrator runs workflows
+
+      Output: a JSON file confirming readiness.
+    subagent: true
+    inputs:
+      - path: .agent/docs/overview.md
+        inject: file
+      - path: .agent/docs/workflow-yaml.md
+        inject: file
+      - path: .agent/docs/structs.md
+        inject: file
+      - path: .agent/docs/manifest.md
+        inject: file
+      - path: .agent/workflows/templates/predefined/spec-write-and-implement/workflow.yaml
+        inject: file_if_exists
+      - path: .agent/workflows/templates/predefined/spec-enforcement/workflow.yaml
+        inject: file_if_exists
+    outputs:
+      - path: data/learn-summary.json
+        struct: learn-summary
+
+  # ──────────────────────────────────────────────
+  # Step 2: DISCUSS
+  # Interactive: discuss the workflow with the user.
+  # Human gate — user must approve the design.
+  # ──────────────────────────────────────────────
+  - name: discuss
+    spec_check: false
+    goal: >
+      Have an interactive discussion with the user to design their workflow.
+
+      1. If "description" param is provided, start from that. Otherwise, ASK:
+         "What task do you want to automate with a workflow? Describe the overall goal."
+
+      2. Understand the task:
+         - What is the input? (files, user text, API data, etc.)
+         - What is the expected output? (files, reports, code changes, etc.)
+         - How many logical phases/steps does it have?
+         - Are there any steps that need human approval?
+         - Are there steps that can run in parallel?
+
+      3. For each step, clarify:
+         - What should the subagent do? (the goal)
+         - What files does it need to read? (inputs)
+         - What files should it produce? (outputs)
+         - Should outputs be validated with a struct schema?
+
+      4. Suggest improvements:
+         - Are there missing steps? (e.g., validation, review)
+         - Would params make the workflow more reusable?
+         - Would parallel execution speed things up?
+         - Does any step need a human gate for review?
+         - Could any step delegate to an existing workflow?
+
+      5. Draft a workflow design summary:
+         - Workflow name and description
+         - List of steps with goals (brief)
+         - Params (if any)
+         - Gate configuration
+         - Input/output file paths
+
+      6. Present the summary to the user for approval.
+
+      DO NOT proceed until the user approves the design.
+
+      If "workflow_name" param is not set, determine a good name
+      (kebab-case, descriptive, e.g., "api-test-generator").
+
+      Output: a JSON file with the approved workflow design.
+    subagent: true
+    inputs:
+      - path: data/learn-summary.json
+        inject: file_if_exists
+    outputs:
+      - path: data/workflow-design.json
+        struct: workflow-design
+    gate:
+      human: true
+
+  # ──────────────────────────────────────────────
+  # Step 3: CREATE
+  # Generate the workflow.yaml and struct schemas.
+  # Output directly to .agent/workflows/<name>/.
+  # ──────────────────────────────────────────────
+  - name: create
+    spec_check: false
+    goal: >
+      Generate the workflow definition files based on the approved design.
+
+      1. Read the approved workflow design from data/workflow-design.json.
+      2. Read the workflow-yaml format reference to ensure correctness.
+      3. Generate workflow.yaml:
+         - Follow the exact format from .agent/docs/workflow-yaml.md
+         - Use proper YAML formatting (multi-line strings with >)
+         - Include clear, detailed goals for each step
+         - Set up inputs/outputs with correct paths
+         - Configure gates per the design
+      4. Generate struct schemas (if the design includes them):
+         - Follow the format from .agent/docs/structs.md
+         - One .schema.yaml per struct
+      5. Generate a README.md for the workflow:
+         - Describe purpose, steps, params
+         - Include usage example
+
+      Write ALL files to: .agent/workflows/templates/my_workflows/{workflow_name}/
+      - .agent/workflows/templates/my_workflows/{workflow_name}/workflow.yaml
+      - .agent/workflows/templates/my_workflows/{workflow_name}/structs/*.schema.yaml (if needed)
+      - .agent/workflows/templates/my_workflows/{workflow_name}/README.md
+
+      After writing, tell the user:
+      - Files created (list paths)
+      - How to run: /run-workflow {workflow_name} [params]
+      - Suggestion to review the generated workflow.yaml before first run
+    subagent: true
+    inputs:
+      - path: data/workflow-design.json
+        struct: workflow-design
+      - path: .agent/docs/workflow-yaml.md
+        inject: file
+      - path: .agent/docs/structs.md
+        inject: file
+    outputs:
+      - path: ".agent/workflows/templates/my_workflows/{workflow_name}/workflow.yaml"
+      - path: ".agent/workflows/templates/my_workflows/{workflow_name}/README.md"

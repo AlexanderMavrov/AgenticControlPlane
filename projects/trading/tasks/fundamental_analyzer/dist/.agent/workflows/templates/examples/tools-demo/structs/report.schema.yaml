@@ -1,0 +1,21 @@
+name: report
+description: Final report combining file analysis and optional DB query
+type: object
+required:
+  - status
+  - source
+fields:
+  status:
+    type: string
+    enum: [ok, warning, error]
+  source:
+    type: string
+    description: Source file that was analyzed
+  line_count:
+    type: number
+  db_records:
+    type: number
+    description: Number of related records from DB (0 if unavailable)
+  summary:
+    type: string
+    description: Brief text summary of findings

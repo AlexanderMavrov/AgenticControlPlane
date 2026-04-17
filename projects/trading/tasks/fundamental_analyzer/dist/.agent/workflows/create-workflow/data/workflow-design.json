@@ -1,0 +1,86 @@
+{
+  "workflow_name": "shapiro-daily-analysis",
+  "description": "Fully automated daily workflow for Shapiro contrarian analysis. Runs the Python data pipeline, reads FT newsletters via Gmail MCP, scores markets using COT positioning + news failures + narrative alignment, updates memory, sends alerts for high-confidence setups, and generates a comprehensive daily analysis report. Replaces the /shapiro skill entirely.",
+  "params": [
+    {
+      "name": "lookback_days",
+      "description": "How many days back to search for FT newsletters in Gmail",
+      "required": false,
+      "default": "3"
+    }
+  ],
+  "steps": [
+    {
+      "name": "run-pipeline",
+      "goal_summary": "Execute python -m shapiro.runner to generate shapiro_report.json with COT percentiles, economic events, and news failures per market.",
+      "subagent": false,
+      "gate": { "structural": true, "semantic": false }
+    },
+    {
+      "name": "load-context",
+      "goal_summary": "Read shapiro_report.json, shapiro_memory.md (if exists), and all data/narratives/*.md files. Prepare a context summary for subsequent steps.",
+      "subagent": false,
+      "gate": { "structural": true, "semantic": false }
+    },
+    {
+      "name": "analyze-newsletters",
+      "goal_summary": "Search Gmail for FT newsletters (label:FT-Newsletters) from the last {lookback_days} days. Read all new newsletters, identify affected watchlist markets, and update data/narratives/{SYMBOL}.md for each affected market. Apply narrative freshness rules.",
+      "subagent": true,
+      "tools": ["gmail"],
+      "gate": { "structural": true, "semantic": true }
+    },
+    {
+      "name": "score-markets",
+      "goal_summary": "For each market with COT extreme positioning (percentile >=70 or <=30): compute Shapiro score using COT Component (0-40), News Failure Component (0-35), and FT Narrative Component (0-25). Interpret narrative alignment as contrarian signal. Assign confidence levels (CONVICTION/HIGH/MEDIUM/LOW).",
+      "subagent": true,
+      "gate": { "structural": true, "semantic": true }
+    },
+    {
+      "name": "update-memory",
+      "goal_summary": "Write updated shapiro_memory.md with active setups, key observations, watch-tomorrow items, and changes from previous run.",
+      "subagent": false,
+      "gate": { "structural": true, "semantic": false }
+    },
+    {
+      "name": "send-alerts",
+      "goal_summary": "For markets with score >= 70 (HIGH or CONVICTION): send Pushover notification (priority 0 for HIGH, 1 for CONVICTION) and email alert via shapiro.notifier.",
+      "subagent": false,
+      "gate": { "structural": true, "semantic": false }
+    },
+    {
+      "name": "write-analysis",
+      "goal_summary": "Generate comprehensive shapiro_daily_analysis.md in Bulgarian. Include per-market scoring tables, contrarian thesis, risk/confirmation tables, news failures table (score >= 65), and upcoming events. Only show markets with score >= 50.",
+      "subagent": true,
+      "gate": { "structural": true, "semantic": true }
+    }
+  ],
+  "gate": {
+    "structural": true,
+    "semantic": true,
+    "human": false,
+    "max_gate_retries": 5,
+    "max_step_retries": 3
+  },
+  "tools": [
+    {
+      "name": "shapiro-runner",
+      "type": "script",
+      "command": "cd C:/Users/aleksandar.mavrov/Projects/ElliotWaveAnalyzer && PYTHONUTF8=1 uv run python -m shapiro.runner"
+    },
+    {
+      "name": "shapiro-notifier",
+      "type": "script",
+      "command": "cd C:/Users/aleksandar.mavrov/Projects/ElliotWaveAnalyzer && PYTHONUTF8=1 uv run python -c \"from shapiro.notifier import PushoverNotifier, EmailNotifier; from shapiro.config import ShapiroConfig\""
+    },
+    {
+      "name": "gmail",
+      "type": "mcp",
+      "required": true,
+      "expected_tools": ["search_threads", "get_thread"]
+    }
+  ],
+  "context": {
+    "carry_forward": "summary"
+  },
+  "approved": true
+}

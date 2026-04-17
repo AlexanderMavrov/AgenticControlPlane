@@ -1,0 +1,129 @@
+name: analysis-report
+version: 1
+description: >
+  Results of applying visual QA rules against the game model.
+  Contains all findings organized by severity and category.
+type: object
+
+required:
+  - totalRulesChecked
+  - totalFindings
+  - findingsBySeverity
+  - findings
+  - status
+
+properties:
+  totalRulesChecked:
+    type: integer
+    description: "Total number of rules that were checked"
+  totalFindings:
+    type: integer
+    description: "Total number of issues found"
+
+  findingsBySeverity:
+    type: object
+    properties:
+      critical: { type: integer }
+      high: { type: integer }
+      medium: { type: integer }
+      low: { type: integer }
+      info: { type: integer }
+
+  findingsByCategory:
+    type: object
+    properties:
+      integrity: { type: integer, description: "[I] cross-reference failures" }
+      consistency: { type: integer, description: "[C] self-consistency violations" }
+      convention: { type: integer, description: "[W] convention-based warnings" }
+
+  findings:
+    type: array
+    description: "All detected issues"
+    items:
+      type: object
+      required: [id, ruleId, category, reportLevel, severity, file, description]
+      properties:
+        id:
+          type: string
+          description: "Finding ID (e.g. F001)"
+        ruleId:
+          type: string
+          description: "Rule that was violated (e.g. B1, C1, N1)"
+        ruleName:
+          type: string
+          description: "Human-readable rule name"
+        category:
+          type: string
+          enum: [integrity, consistency, convention]
+          description: "[I], [C], or [W] category"
+        reportLevel:
+          type: string
+          enum: [error, warning]
+          description: "error for integrity/consistency, warning for convention"
+        severity:
+          type: string
+          enum: [critical, high, medium, low, info]
+        file:
+          type: string
+          description: "Relative path to the file with the issue"
+        element:
+          type: string
+          description: "Element ID within the view (e.g. text_amount_max)"
+        property:
+          type: string
+          description: "Property name (e.g. color, scale, position)"
+        actualValue:
+          type: string
+          description: "Current value found"
+        expectedValue:
+          type: string
+          description: "Expected/correct value per rule"
+        description:
+          type: string
+          description: "Human-readable description of the issue"
+        suggestedFix:
+          type: object
+          description: "Proposed fix for this finding"
+          properties:
+            file:
+              type: string
+              description: "File to modify"
+            jsonPath:
+              type: string
+              description: "JSON path to the property (e.g. elements[2].color)"
+            newValue:
+              type: string
+              description: "Proposed new value"
+
+  rulesPassed:
+    type: array
+    description: "Rules that passed cleanly"
+    items: { type: string }
+
+  rulesSkipped:
+    type: array
+    description: "Rules that were not applicable"
+    items:
+      type: object
+      properties:
+        ruleId: { type: string }
+        reason: { type: string }
+
+  decisions:
+    type: array
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question: { type: string }
+        options_considered:
+          type: array
+          items: { type: string }
+        resolution: { type: string }
+        resolved_by:
+          type: string
+          enum: [agent, user]
+
+  status:
+    type: string
+    enum: [success, partial, failed]

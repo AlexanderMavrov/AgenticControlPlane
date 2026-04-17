@@ -1,0 +1,100 @@
+name: fix-report
+version: 1
+description: >
+  Results of applying fixes for findings from the analysis and visual reports.
+  Tracks each proposed fix and whether it was applied, skipped, or user-approved.
+type: object
+
+required:
+  - totalFixesProposed
+  - totalFixesApplied
+  - totalFixesSkipped
+  - fixes
+  - status
+
+properties:
+  totalFixesProposed:
+    type: integer
+    description: "Total fixes proposed across all findings"
+  totalFixesApplied:
+    type: integer
+    description: "Fixes that were applied to source files"
+  totalFixesSkipped:
+    type: integer
+    description: "Fixes skipped (user declined or not applicable)"
+  totalFixesUserApproved:
+    type: integer
+    description: "Fixes applied after explicit user approval"
+
+  fixes:
+    type: array
+    description: "All proposed fixes with their outcomes"
+    items:
+      type: object
+      required: [findingId, ruleId, file, status]
+      properties:
+        findingId:
+          type: string
+          description: "Finding ID from analysis-report (e.g. F001)"
+        ruleId:
+          type: string
+          description: "Rule that was violated (e.g. C1, N1)"
+        category:
+          type: string
+          enum: [integrity, consistency, convention]
+        file:
+          type: string
+          description: "File that was modified (relative path)"
+        change:
+          type: object
+          description: "Details of the change"
+          required: [jsonPath, oldValue, newValue]
+          properties:
+            jsonPath:
+              type: string
+              description: "JSON path to the modified property (e.g. elements[2].color)"
+            oldValue:
+              type: string
+              description: "Value before the fix"
+            newValue:
+              type: string
+              description: "Value after the fix"
+        status:
+          type: string
+          enum: [applied, proposed, skipped, user_approved]
+          description: >
+            applied = auto-fixed (auto_fix was true),
+            proposed = presented but not yet acted on,
+            skipped = user declined or not applicable,
+            user_approved = user confirmed and fix was applied
+        reason:
+          type: string
+          description: "Why this fix was proposed, or why it was skipped"
+        visuallyConfirmed:
+          type: boolean
+          description: "Whether the visual validation step confirmed this finding"
+
+  filesModified:
+    type: array
+    description: "List of all files that were modified"
+    items: { type: string }
+
+  decisions:
+    type: array
+    items:
+      type: object
+      required: [question, resolution, resolved_by]
+      properties:
+        question: { type: string }
+        options_considered:
+          type: array
+          items: { type: string }
+        resolution: { type: string }
+        resolved_by:
+          type: string
+          enum: [agent, user]
+
+  status:
+    type: string
+    enum: [success, partial, skipped, failed]
+    description: "skipped if no fixable findings were found"

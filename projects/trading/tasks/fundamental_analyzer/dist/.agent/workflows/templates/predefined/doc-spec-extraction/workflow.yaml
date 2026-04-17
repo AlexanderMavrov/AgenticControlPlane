@@ -1,0 +1,466 @@
+name: doc-spec-extraction
+version: 3
+description: >
+  Extract behavioral specifications from technical documentation.
+  Performs deep analysis of the source document — requirements may be
+  scattered across sections, interdependent, or implicitly derived.
+  Detects existing specs, merges/updates, and flags discrepancies.
+  Output goes to .agent/specs/ for reuse by other workflows.
+
+  This is a generic workflow — works with any documentation source.
+
+params:
+  - name: source
+    description: >
+      Path to the source document to analyze.
+      Can be any technical document: programming guide, API reference,
+      specification, standard, etc.
+    required: true
+
+  - name: focus
+    description: >
+      Free-text description of which parts of the document to focus on.
+      Can be section numbers, topic names, keywords, or a natural language
+      description (e.g., "error handling and recovery", "sections 3.2 through 3.5",
+      "everything related to message queues and persistence").
+      If omitted, the full document is analyzed.
+    required: false
+
+  - name: supplementary
+    description: >
+      Path to a supplementary document (FAQ, errata, addendum, etc.).
+      Used as additional reference during analysis. Requirements in the
+      supplementary document may clarify, amend, or override requirements
+      in the main source. If not available, analysis proceeds without it.
+    required: false
+
+  - name: domain
+    description: >
+      Target domain for the extracted specs (e.g., "messaging", "recovery").
+      If omitted, the ANALYZE step discovers domains automatically from
+      the document structure and content.
+    required: false
+
+  - name: rewrite
+    description: >
+      When "true", EXTRACT writes ALL specs from scratch from the source
+      document. Existing specs are read only for cross-references, but
+      Rule Statement, Examples, and Validation Criteria are written fresh.
+      Use when existing specs may have accumulated inaccuracies across
+      multiple merge passes. Default: "false" (merge mode).
+    required: false
+    default: "false"
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+
+steps:
+  # ──────────────────────────────────────────────
+  # Step 1: ANALYZE
+  # Deep document analysis. Identify ALL requirements.
+  # Check existing specs. Propose spec placement.
+  # Human gate — user validates understanding.
+  # ──────────────────────────────────────────────
+  - name: analyze
+    spec_check: false
+    goal: >
+      Perform a DEEP analysis of the source document to identify all
+      extractable behavioral requirements.
+
+      **IMPORTANT — Requirements analysis principles:**
+      - Requirements are often SCATTERED across multiple sections.
+        A single behavioral rule may be defined in one section, constrained
+        in another, and have exceptions listed in a third. You MUST read
+        the FULL document (or at least all sections related to the focus
+        area) to capture complete requirements.
+      - Requirements can INFLUENCE each other, even indirectly. A constraint
+        on module A may imply a constraint on module B if B depends on A.
+        Trace these dependencies.
+      - Some requirements are IMPLICIT — derived from examples, error handling
+        descriptions, or "what happens when" scenarios. Extract these too.
+      - Pay attention to SEVERITY language: "must", "shall", "required" → MUST;
+        "should", "recommended" → SHOULD; "may", "optional", "can" → MAY.
+
+      **Step-by-step:**
+
+      1. Read the source document completely (even if "focus" param is set —
+         you need full context to understand cross-references and dependencies).
+
+      2. IF "focus" param is provided:
+         - Interpret it as a guide for which topics/sections to prioritize.
+           It may be section numbers, keywords, or free-text description.
+         - If the focus text doesn't clearly match any section: list the
+           5 closest matches and ASK the user which one they meant.
+           Do NOT proceed until the user confirms.
+         - Even with a focus, check other sections for requirements that
+           AFFECT the focused area (dependencies, constraints, overrides).
+
+      3. IF "supplementary" param is provided:
+         - Read the supplementary document.
+         - Cross-reference: requirements in supplementary may clarify,
+           amend, or contradict the main source. Note any discrepancies.
+
+      4. Identify logical DOMAINS (groupings) for the requirements.
+         If "domain" param is set, use it as the primary domain.
+         Otherwise, discover domains from the document structure
+         (e.g., chapters, functional areas, subsystems).
+
+      5. Check .agent/specs/ for EXISTING specs in the identified domains.
+         For each existing spec:
+         - Does the source document confirm, modify, or contradict it?
+         - Are there new requirements that affect this spec?
+         - **Qualifier check:** Compare the source text against the existing
+           Rule Statement. If the source uses qualifier words (eventually,
+           immediately, before/after, only when, unless) that are absent
+           from the Rule Statement, mark the spec as "needs_update" with
+           a note about the missing qualifier — even if the spec is
+           otherwise correct.
+         - Note: spec_id format is DOMAIN-NNN (e.g., MSG-001).
+         - IF "rewrite" param is "true": mark ALL existing specs as
+           "needs_update" regardless of accuracy — they will be rewritten
+           from scratch in EXTRACT.
+
+      6. Produce an analysis report (JSON) that shows the user:
+         - YOUR UNDERSTANDING of the document scope and focus area
+         - Discovered domains with descriptions
+         - For each domain: list of requirements found, with source references
+           (section numbers / page references / quotes)
+         - For each requirement: severity (MUST/SHOULD/MAY), related
+           requirements (cross-references), and any ambiguities
+         - Existing specs: which are still valid, which need updating,
+           which are contradicted by the source
+         - PROPOSED spec placement: which requirements become which specs,
+           in which domain directories
+         - spec_mapping: one entry for EVERY file in .agent/specs/ —
+           including specs in domains that differ from the proposed
+           structure. For each, state which proposed spec (by
+           proposed_spec_id) covers the same requirement — even if
+           the domain or spec_id changed. If no proposed spec covers
+           an existing one, map to null with reason (requirement outside
+           focus area, merged into another spec, not found in source).
+           VALIDATE uses this to compare the correct pairs regardless
+           of structural changes.
+         - Estimated number of spec files to create/update per domain
+         - Any discrepancies or ambiguities that need user clarification
+
+      The goal is to give the user FULL VISIBILITY into what you found
+      and what you plan to do, BEFORE any specs are written.
+    subagent: true
+    inputs:
+      - path: "{source}"
+        inject: reference
+      - path: "{supplementary}"
+        inject: file_if_exists
+      - path: ".agent/specs/**/*.md"
+        inject: file_if_exists
+      - path: ".agent/specs/_index.json"
+        inject: file_if_exists
+    outputs:
+      - path: data/analysis-report.json
+        struct: analysis-report
+    gate:
+      human: true
+
+  # ──────────────────────────────────────────────
+  # Step 2: EXTRACT
+  # Write draft specs based on the approved analysis.
+  # Parallel fan-out by domain.
+  # For existing specs: merge/update, don't overwrite blindly.
+  # ──────────────────────────────────────────────
+  - name: extract
+    spec_check: false
+    goal: >
+      For the assigned domain, write draft spec files based on the
+      approved analysis report.
+
+      Read the struct schema at structs/spec.schema.yaml for the exact format.
+
+      **For EACH requirement identified in the analysis:**
+
+      1. Create one .md file per spec in data/drafts/{domain}/
+      2. YAML frontmatter: spec_id, title, severity, domain,
+         source_sections, related_specs
+      3. spec_id format: DOMAIN-NNN (e.g., MSG-001, REC-012)
+         Use uppercase domain abbreviation (2-4 chars) + 3-digit number.
+      4. Severity: MUST (mandatory), SHOULD (recommended), MAY (optional)
+         — as determined in the analysis step.
+      5. Required sections: Rule Statement, Rationale, Valid Examples,
+         Invalid Examples, Validation Criteria, Source Reference
+
+      **Writing quality requirements:**
+      - Rule Statement must be PRECISE and TESTABLE. Avoid vague language.
+      - However, preserve qualifier words from the source that carry
+        semantic meaning: timing (eventually, immediately, before/after X),
+        conditionality (only when, unless, if), scope (in idle state,
+        during recovery), and mechanism flexibility (by calling, via,
+        through). These are constraints, not vague language — dropping
+        them silently changes the requirement.
+      - Include cross-references to related specs in related_specs frontmatter.
+      - Source Reference must cite specific sections/paragraphs from the
+        source document so a reader can verify the requirement.
+      - Valid/Invalid Examples should be concrete, realistic, and minimal.
+      - Validation Criteria must be semantically aligned with the Rule
+        Statement and Rationale — not a simplified pattern search.
+        If the rule allows indirect/deferred mechanisms (e.g., "eventually
+        calls X"), criteria must check the full code path, not just the
+        immediate call site.
+        If the rule forbids X "for purpose Y" and the Rationale explains
+        a specific mechanism of harm, criteria must verify that each found
+        instance can actually trigger that harm — an occurrence that is
+        unreachable or structurally cannot trigger the described mechanism
+        (e.g., the forbidden pattern exists but can never execute, or a
+        precondition for the harm is structurally absent) is not a violation.
+        Describe WHAT to verify, WHERE to look, and WHAT to exclude.
+      - After writing Validation Criteria, self-check: if any criterion
+        reduces to "search for keyword/pattern X in the codebase," ask
+        whether finding X is sufficient to confirm a violation — or
+        whether the occurrence must also be reachable, functional, and
+        capable of triggering the harm described in the Rationale. If the
+        latter, rewrite the criterion to include what to verify AFTER
+        finding the pattern, and what to EXCLUDE (e.g., occurrences that
+        are unreachable or cannot trigger the described mechanism).
+
+      **IF "rewrite" param is "true":**
+      - Ignore existing spec text entirely. Write every spec from
+        scratch based on the source document and analysis report.
+      - Read existing specs ONLY for related_specs cross-references
+        and spec_id numbering continuity.
+      - Add a "## Changes" section noting: "Full rewrite from source."
+
+      **IF existing specs were found AND "rewrite" is "false" (default):**
+      - Read the existing spec carefully.
+      - Compare against what the source document says.
+      - Before declaring "No changes", verify that the existing Rule
+        Statement preserves qualifier words from the source. If the
+        Source Reference quotes a phrase but the Rule Statement omits
+        a qualifier from it (e.g., "eventually", "only when"), that
+        IS a change to make — update the Rule Statement.
+      - Write a MERGED draft that:
+        * Preserves content from the existing spec that is still accurate
+        * Corrects inaccuracies found by comparing with the source
+        * Adds new requirements discovered in the analysis
+        * Improves examples if the source provides better ones
+      - Add a "## Changes" section at the END noting what was updated
+        compared to the existing version.
+
+      **IF no existing specs (new domain):**
+      - Write new spec from scratch based on the source document.
+      - Be thorough — extract ALL requirements, not just the obvious ones.
+
+      **Cross-references between specs:**
+      - If a requirement in this domain depends on or affects a requirement
+        in another domain, add it to related_specs.
+      - Use the spec_id from the analysis report for cross-domain references.
+      - When rewriting or merging an existing spec, read its current
+        related_specs field. PRESERVE all cross-domain references (specs
+        from OTHER domains) — these were established by previous runs
+        and reflect real inter-domain dependencies. You may ADD new
+        references, but do NOT remove existing cross-domain ones unless
+        the referenced spec no longer exists.
+    subagent: true
+    parallel: true
+    parallel_key: "analysis-report.domains[status=pending]"
+    inputs:
+      - path: data/analysis-report.json
+        struct: analysis-report
+      - path: structs/spec.schema.yaml
+        inject: file
+      - path: "{source}"
+        inject: reference
+      - path: "{supplementary}"
+        inject: file_if_exists
+      - path: ".agent/specs/{domain}/*.md"
+        inject: file_if_exists
+    outputs:
+      - path: "data/drafts/{domain}/*.md"
+        struct: spec
+
+  # ──────────────────────────────────────────────
+  # Step 3: VALIDATE
+  # Cross-validate ALL drafts against the source.
+  # Check completeness, accuracy, internal consistency.
+  # Flag discrepancies with existing specs for user decision.
+  # ──────────────────────────────────────────────
+  - name: validate
+    spec_check: false
+    goal: >
+      Validate ALL draft specs against the source document and existing specs.
+      This is a thorough quality gate — every spec must be verified.
+
+      **IMPORTANT: You MUST read and compare each draft spec yourself.
+      Do NOT write scripts or code to automate the validation. Scripts
+      can check metadata (file existence, frontmatter fields) but CANNOT
+      perform the semantic checks below — accuracy, completeness,
+      consistency, and testability require reading and understanding
+      the actual content of both the draft and the source document.**
+
+      **Validation checks for EACH draft spec:**
+
+      1. ACCURACY — Does the Rule Statement accurately reflect what the
+         source document says? Read the cited source_sections and verify
+         word-by-word. Flag any misinterpretation.
+         In particular, verify that qualifier words from the source
+         (eventually, immediately, before, after, only when, unless) are
+         preserved in the Rule Statement. A missing qualifier silently
+         narrows or broadens the requirement.
+
+      2. COMPLETENESS — Are ALL requirements from the cited source sections
+         captured? Read the source sections again and check for requirements
+         that were missed in the draft.
+
+      3. CONSISTENCY — Do the specs in this domain contradict each other?
+         Check cross-domain references too. If spec A says "must do X" and
+         spec B says "must not do X", that's a conflict.
+
+      4. TRACEABILITY — Does every requirement have a clear source reference?
+         Can a reader find the original text in the source document?
+         Compare the draft's related_specs against the analysis report's
+         cross_domain_dependencies. If a documented dependency is absent
+         from the draft's related_specs, flag it.
+
+      5. TESTABILITY — Are the Validation Criteria concrete enough to
+         actually verify compliance? Vague criteria like "should work
+         correctly" are not acceptable.
+         When spec_mapping shows an existing predecessor, compare the
+         draft's Validation Criteria against the existing spec's. If the
+         existing spec provided specific exclusions or boundary guidance
+         that the draft omits, note it as a testability concern.
+
+      6. EXAMPLES — Are Valid/Invalid Examples realistic and correct?
+         Do they actually demonstrate the rule?
+
+      **Comparison with existing specs (all modes — merge AND rewrite):**
+      - Use the spec_mapping from the analysis report to find the correct
+        existing spec for each draft. Do NOT match by spec_id alone —
+        structure may have changed (domain rename, spec split/merge).
+      - For each draft with a mapped existing spec: verify the draft is
+        STRICTLY BETTER — more accurate, more complete, better examples.
+        If the draft LOSES information that was correct in the existing
+        spec (content, cross-references, interpretation notes, examples),
+        flag as "regression".
+      - If there are DISCREPANCIES between what the existing spec says
+        and what the source document says, flag them clearly — these
+        need user decision (the existing spec may have been manually
+        refined and the "discrepancy" may be intentional).
+      - For existing specs mapped to null in spec_mapping (orphaned):
+        verify the reason is valid. If the existing spec covers a real
+        requirement from the source that no new draft covers, flag as
+        "coverage_gap".
+
+      **Cross-domain validation:**
+      - Check that cross-references (related_specs) point to specs that
+        actually exist (either as drafts or existing specs).
+      - Verify that if spec A references spec B, the relationship makes
+        sense (they actually interact or depend on each other).
+
+      **Produce a validation report (JSON) with per-spec results:**
+      - spec_id, domain, draft_path
+      - status: valid | issues_found | conflict | regression | coverage_gap
+      - checks_performed: list of ALL 6 checks actually performed on
+        this spec (accuracy, completeness, consistency, traceability,
+        testability, examples). Every spec MUST have all 6 listed.
+      - For valid: confirmation summary
+      - For issues_found: list of issues with severity and suggested fixes
+      - For conflict: which specs conflict and how
+      - For regression: what was lost compared to existing spec
+      - For coverage_gap: which existing spec lost coverage and why
+      - overall_quality: percentage of specs that passed all checks
+      - discrepancies: list of existing-vs-source disagreements for user
+    subagent: true
+    inputs:
+      - path: "data/drafts/**/*.md"
+        struct: spec
+      - path: ".agent/specs/**/*.md"
+        inject: file_if_exists
+      - path: "{source}"
+        inject: reference
+      - path: "{supplementary}"
+        inject: file_if_exists
+      - path: data/analysis-report.json
+        inject: file
+    outputs:
+      - path: data/validation-report.json
+        struct: validation-report
+
+  # ──────────────────────────────────────────────
+  # Step 4: COMMIT
+  # Write final specs to .agent/specs/.
+  # Handle discrepancies. Report results.
+  # ──────────────────────────────────────────────
+  - name: commit
+    spec_check: false
+    goal: >
+      Finalize specs based on the validation report.
+
+      **CRITICAL: You MUST read and follow data/validation-report.json.
+      If it exists, it is authoritative — never skip it, never treat
+      it as stale, never override it. Process EACH spec according to
+      its status below. If the file does not exist, STOP and report
+      an error — do not proceed without validation.**
+
+      **Processing rules by validation status:**
+
+      1. "valid" specs:
+         - For NEW specs: copy from data/drafts/{domain}/ to .agent/specs/{domain}/
+         - For MERGED specs: overwrite old version in .agent/specs/{domain}/
+
+      2. "issues_found" specs:
+         - If issues are minor (formatting, typos): fix inline and commit.
+         - If issues are significant (accuracy, completeness): leave in
+           data/drafts/ for human review. Report the issues clearly.
+
+      3. "conflict" specs:
+         - Leave in data/drafts/ for human review. Do NOT overwrite.
+         - Report: which specs conflict and what the user needs to decide.
+
+      4. "regression" specs:
+         - Leave in data/drafts/. Do NOT overwrite the existing spec.
+         - Report: what information would be lost and why.
+
+      5. "coverage_gap" specs (orphaned existing specs):
+         - Do NOT delete the existing spec from .agent/specs/.
+         - Report: which existing spec lost coverage, and the reason
+           from spec_mapping.
+         - Suggest: user should decide whether the requirement is still
+           relevant and which new spec (if any) should absorb it.
+
+      **After processing all specs:**
+
+      1. Update .agent/specs/_index.json with metadata for all committed specs
+         (spec_id, domain, title, severity, file path, source_document, last_updated).
+
+      2. Update .agent/specs/_registry.json if any specs reference source
+         code files (add mappings with relationship: "direct").
+
+      3. Write a DETAILED SUMMARY to the chat:
+         - Source document analyzed
+         - Focus area (if specified)
+         - Total requirements identified → total specs produced
+         - Per domain: committed (N), needs review (N), conflicts (N)
+         - For each committed spec: spec_id, title, severity — one line
+         - For each spec needing review: spec_id + what needs attention
+         - Discrepancies found: list with recommendation
+         - Cross-references: any broken or suspicious links
+         - Suggested next steps (e.g., "review 3 conflicts in data/drafts/",
+           "run /run-workflow doc-spec-extraction --focus 'section 4' for
+           remaining sections")
+
+      Do NOT commit to git.
+    subagent: true
+    inputs:
+      - path: data/validation-report.json
+      - path: "data/drafts/**/*.md"
+      - path: ".agent/specs/_index.json"
+        inject: file_if_exists
+      - path: ".agent/specs/_registry.json"
+        inject: file_if_exists
+    outputs:
+      - path: ".agent/specs/{domain}/*.md"
+      - path: ".agent/specs/_index.json"

@@ -1,0 +1,17 @@
+name: enriched
+description: Enriched analysis with metadata fields added by transform_json
+type: object
+required:
+  - file
+  - _enriched
+fields:
+  file:
+    type: string
+  line_count:
+    type: number
+  char_count:
+    type: number
+  _enriched:
+    type: boolean
+  _field_count:
+    type: number

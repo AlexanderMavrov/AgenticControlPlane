@@ -1,0 +1,35 @@
+name: verification-report
+description: >
+  Post-implementation verification report.
+  Records which specs were checked and whether all requirements are satisfied.
+format: json
+
+json_schema:
+  required_fields:
+    - field: component
+      type: string
+    - field: specs_checked
+      type: array
+    - field: specs_checked[].spec_id
+      type: string
+    - field: specs_checked[].status
+      type: string
+      enum: [satisfied, violated, partially_satisfied]
+    - field: all_satisfied
+      type: boolean
+    - field: violations
+      type: array
+    - field: violations[].spec_id
+      type: string
+    - field: violations[].requirement
+      type: string
+    - field: violations[].issue
+      type: string
+    - field: violations[].file
+      type: string
+    - field: violations[].line_number
+      type: number
+
+file_checks:
+  exists: true
+  min_size: 50
