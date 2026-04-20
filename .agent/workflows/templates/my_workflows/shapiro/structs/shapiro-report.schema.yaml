@@ -1,0 +1,27 @@
+name: shapiro-report
+version: 2
+description: >
+  Validates the output of the Shapiro Python data pipeline (shapiro.runner).
+  Contains COT percentiles, crowding direction, bias, upcoming events, and
+  news failures for each watchlist market.
+
+  NOTE: Per-symbol field validation inside the markets object is NOT enforced
+  here — schema-validate.py has no wildcard key support. The LLM in
+  load-context/score-markets reads this file and will fail downstream if
+  any market is missing required fields. A stronger schema would require
+  the pipeline to emit markets as an array of {symbol, cot_percentile, ...}.
+format: json
+
+json_schema:
+  required_fields:
+    - field: generated_at
+      type: string
+    - field: upcoming_events
+      type: array
+    - field: markets
+      type: object
+      min_items: 1
+
+file_checks:
+  exists: true
+  min_size: 100

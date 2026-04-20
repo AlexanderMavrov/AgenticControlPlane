@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "extras": [
+    {
+      "src": "extras/tools/game-creator.html",
+      "dst": ".agent/tools/game-creator.html"
+    }
+  ]
+}

@@ -1,1 +1,7 @@
 __pycache__/
+
+# Machine-specific symlinks — each machine recreates locally
+projects/trading/elliott_wave_source
+
+# Runtime logs
+.agent/gate-check-invocations.log

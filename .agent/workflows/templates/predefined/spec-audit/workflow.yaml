@@ -1,0 +1,496 @@
+name: spec-audit
+version: 1
+description: >
+  Read-only QA compliance audit: scan source code against behavioral specs
+  and report violations. NEVER modifies any source code, spec files, or
+  registry files — produces a structured audit report grouped by severity.
+
+  Supports filtering by domain, component, spec_id, or severity level.
+  Optional suggest_fixes mode includes concrete remediation suggestions
+  (text only — no actual code edits).
+
+params:
+  - name: scope
+    description: >
+      Which spec scope to audit (e.g., "astro", "ares", "generic", "all").
+      Specs live in .agent/specs/<scope>/<domain>/. The implicit "generic"
+      scope is always included alongside the selected scope (cross-integration
+      invariants apply everywhere). Use "all" to audit every scope in the
+      project. Default: "generic" — safe for projects that have not set up
+      scoping. When the project has _scope-config.json and an active scope,
+      consider passing the active scope explicitly for clarity.
+    required: false
+    default: "generic"
+
+  - name: domain
+    description: >
+      Filter audit to a specific domain (e.g., "recovery", "messaging").
+      If not provided, all domains in the selected scope are audited.
+    required: false
+
+  - name: component
+    description: >
+      Filter audit to a specific component (e.g., "EditField").
+      If not provided, all components in the selected domain(s) are audited.
+    required: false
+
+  - name: spec_id
+    description: >
+      Filter audit to a single spec by spec_id (e.g., "ui/EditField").
+      Most specific filter — overrides domain and component if set.
+    required: false
+
+  - name: severity_filter
+    description: >
+      Minimum severity level to check. "all" checks MUST+SHOULD+MAY.
+      "must" checks only MUST requirements. "must+should" checks MUST
+      and SHOULD, skips MAY.
+    required: false
+    default: "all"
+
+  - name: suggest_fixes
+    description: >
+      When "true", scan results include suggested code changes for each
+      violation (text description, not actual edits). When "false" (default),
+      report only — no fix suggestions.
+    required: false
+    default: "true"
+
+  - name: include_unregistered
+    description: >
+      When "true", SCAN subagents also search the codebase for files
+      matching component names that are not in _registry.json. When "false",
+      only files from _registry.json mappings are checked.
+    required: false
+    default: "true"
+
+  - name: orchestrator_verify
+    description: >
+      When "true", the orchestrator (best available model) performs a
+      deep verification step on all violations and partials found by SCAN.
+      It reads the actual function implementations (not just call sites)
+      to reclassify findings as confirmed, false_positive, or inconclusive.
+      When "false", SCAN results go directly to REPORT without verification.
+    required: false
+    default: "true"
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+
+steps:
+  # ──────────────────────────────────────────────
+  # Step 1: DISCOVER
+  # Resolve audit scope — which specs, which files.
+  # Human gate — user confirms before scan fan-out.
+  # ──────────────────────────────────────────────
+  - name: discover
+    spec_check: false
+    goal: >
+      Determine the audit scope: which specs to check and which source files
+      to scan. This is a PLANNING step — do NOT read source files yet, only
+      resolve paths and metadata.
+
+      **IMPORTANT: This workflow is PURE READ-ONLY. You must NOT create,
+      modify, or delete any files outside of the workflow data directory.**
+
+      **Step-by-step:**
+
+      1. Resolve the audit scope set from the "scope" param:
+         - If scope == "all": read .agent/specs/_scope-config.json (if
+           present) to enumerate all declared scopes; always include "generic".
+         - Otherwise: the set is [<scope>, "generic"] (deduped).
+         Record the resolved scope set in the discovery plan as "scopes_audited".
+
+         For each scope in the set, read .agent/specs/<scope>/_index.json
+         to get the list of active specs. Merge the specs into one catalog,
+         annotating each entry with its source scope.
+
+         If no scope yielded any specs:
+         - Report "No specs found in scope(s) [<set>]. Run doc-spec-extraction
+           or create specs manually before running spec-audit."
+         - Write a discovery-plan.json with empty domains array and
+           status "no_specs_found". The gate will pass but SCAN will
+           produce an empty report.
+
+      2. Apply filters (most specific wins):
+         - If "spec_id" param is set: find that single spec. If not found,
+           list the 3 closest matches and STOP — ask user to clarify.
+         - Else if "component" param is set: filter to specs matching
+           that component name (across all domains, or within "domain"
+           if also set).
+         - Else if "domain" param is set: filter to all specs in that domain.
+         - Else: include ALL active specs.
+
+      3. Apply severity_filter:
+         - "all" → check MUST, SHOULD, and MAY
+         - "must" → check only MUST requirements
+         - "must+should" → check MUST and SHOULD, skip MAY
+         Record the active severity levels in the discovery plan.
+
+      4. Read .agent/specs/<scope>/_registry.json for each scope in the
+         audit set to resolve implementation files.
+         For each spec in scope:
+         - Find its entry in _registry.json mappings
+         - Collect all "implemented_by" file paths (all relationship types)
+         - If a spec has NO entry in _registry.json: mark it as
+           "no_registry_mapping" — it can still be audited if
+           "include_unregistered" is true (subagent will search codebase)
+         - If a spec has an entry but implemented_by is empty: mark as
+           "no_implementation_files"
+
+      5. Group specs by domain. For each domain, produce:
+         - domain name
+         - list of specs to audit (spec_id, title, severity levels present,
+           spec file path, implementation files from registry)
+         - status: "pending"
+         - estimated_files: total number of source files to scan
+
+      6. Produce a discovery-plan.json with:
+         - scope: the scope param value (e.g., "astro", "generic", "all")
+         - scopes_audited: array of actual scope ids whose specs are in scope
+         - audit scope summary (total specs, total domains, total files)
+         - filters applied (domain, component, spec_id, severity_filter)
+         - severity_levels: which levels are active
+         - suggest_fixes: boolean (from param)
+         - include_unregistered: boolean (from param)
+         - domains array (one entry per domain, each with specs and files)
+         - warnings: any specs with no registry mapping, missing files, etc.
+
+      Present a clear summary to the user showing what will be audited.
+    subagent: true
+    inputs:
+      - path: ".agent/specs/_scope-config.json"
+        inject: file_if_exists
+      - path: ".agent/specs/{scope}/_index.json"
+        inject: file_if_exists
+      - path: ".agent/specs/{scope}/_registry.json"
+        inject: file_if_exists
+      - path: ".agent/specs/generic/_index.json"
+        inject: file_if_exists
+      - path: ".agent/specs/generic/_registry.json"
+        inject: file_if_exists
+    outputs:
+      - path: "data/{run_id}-discovery-plan.json"
+        struct: discovery-plan
+    gate:
+      human: true
+
+  # ──────────────────────────────────────────────
+  # Step 2: SCAN
+  # Parallel per-domain. Each subagent reads specs
+  # + source files and checks compliance.
+  # READ-ONLY — never modifies source code.
+  # ──────────────────────────────────────────────
+  - name: scan
+    spec_check: false
+    goal: >
+      For the assigned domain, check every in-scope spec requirement against
+      the implementing source code. Report all violations found.
+
+      **CRITICAL: This is a READ-ONLY audit. Do NOT modify any source code
+      files, spec files, or registry files. Only READ and REPORT.**
+
+      **Step-by-step for each spec in this domain:**
+
+      1. Read the spec file from .agent/specs/<scope>/<domain>/ where
+         <scope> is the spec's source scope as recorded in the discovery plan.
+      2. Parse all requirements from the ## Requirements section. Each
+         requirement has a severity level (MUST, SHOULD, MAY). Only check
+         requirements whose severity is in the active severity_levels
+         from the discovery plan.
+      3. Read each implementing source file listed in the discovery plan
+         for this spec.
+         If "include_unregistered" is true in the discovery plan AND
+         the spec has "no_registry_mapping" status:
+         - Search the codebase for files matching the component name
+           (PascalCase, kebab-case, snake_case variants)
+         - EXCLUDE: node_modules/, .agent/, .cursor/, dist/, build/
+         - Include any matched files in the scan
+      4. For EACH requirement at active severity level:
+         a. Read the relevant source code sections
+         b. Determine compliance status:
+            - "compliant" — code satisfies the requirement
+            - "violation" — code clearly violates the requirement
+            - "partial" — code partially satisfies (some cases handled,
+              others not)
+            - "unverifiable" — cannot determine from static code analysis
+              alone (e.g., runtime behavior, external dependencies, or
+              implementation file not found)
+         c. For violations and partials:
+            - Identify the file path and approximate line number
+            - Quote the relevant code snippet (max 5 lines)
+            - Explain HOW it violates the requirement
+            - Rate the impact: "critical" (breaks core behavior),
+              "moderate" (degrades functionality), "minor" (cosmetic/edge case)
+
+      5. IF "suggest_fixes" is true in the discovery plan:
+         For each violation, include a "suggested_fix" field with a
+         concrete description of what code change would resolve the
+         violation. Use before/after snippets where practical.
+         Keep suggestions minimal — only the necessary change.
+         IF "suggest_fixes" is false: omit the suggested_fix field entirely.
+
+      6. Produce a scan-result JSON for this domain with:
+         - domain name
+         - specs_checked: number of specs checked
+         - requirements_checked: total requirements evaluated
+         - status counts: compliant, violation, partial, unverifiable
+         - per-spec results with per-requirement compliance details
+         - violations_summary: flat list of violations with severity and impact
+    subagent: true
+    parallel: true
+    parallel_key: "discovery-plan.domains[status=pending]"
+    inputs:
+      - path: "data/{run_id}-discovery-plan.json"
+        struct: discovery-plan
+      - path: ".agent/specs/{scope}/{domain}/*.md"
+        inject: file
+      - path: ".agent/specs/generic/{domain}/*.md"
+        inject: file_if_exists
+      - path: ".agent/specs/{scope}/_registry.json"
+        inject: file_if_exists
+      - path: ".agent/specs/generic/_registry.json"
+        inject: file_if_exists
+    outputs:
+      - path: "data/scans/{run_id}-{domain}-scan-result.json"
+        struct: scan-result
+
+  # ──────────────────────────────────────────────
+  # Step 3: VERIFY (optional, orchestrator_verify)
+  # Orchestrator deep-checks each violation/partial
+  # by reading function implementations, not just
+  # call sites. Reclassifies findings.
+  # ──────────────────────────────────────────────
+  - name: verify
+    spec_check: false
+    subagent: false
+    goal: >
+      **IF the "orchestrator_verify" param is "false": skip this step
+      entirely — write a verified-results JSON with
+      {"skipped": true, "reason": "orchestrator_verify=false"} and move on.**
+
+      Deep-verify every finding with status "violation" or "partial" from
+      the SCAN results. You are the orchestrator — the strongest model in
+      this workflow. SCAN subagents may have made shallow assessments based
+      on call-site code alone. Your job is to go deeper.
+
+      **CRITICAL: This is a READ-ONLY step. Do NOT modify any source code,
+      spec files, or registry files.**
+
+      **MANDATORY WORKFLOW — analyze each finding INDIVIDUALLY:**
+
+      Do NOT batch-read "key source files" and then assess all findings
+      from memory. Instead, process findings ONE BY ONE. For each finding,
+      perform a complete read-analyze-classify cycle before moving to the
+      next one. This prevents skipping implementation details.
+
+      **Step-by-step:**
+
+      1. Read all scan result files. Build a list of every finding where
+         compliance_status is "violation" or "partial". Note for each:
+         - spec_id, requirement text, severity
+         - file path, line number, code snippet from SCAN
+         - SCAN's explanation of the violation
+
+      2. **Process each finding individually, one at a time:**
+
+         For finding N of M:
+
+         a. Read the source file at the reported location. Find the exact
+            lines SCAN flagged.
+
+         b. **MANDATORY — trace EVERY called function/method:**
+            Identify ALL function/method calls at the flagged location.
+            For EACH one, find and READ its implementation in the actual
+            .cpp/.c source file (not just the header declaration).
+
+            **Why this matters:** A method named "SetX({})" might append
+            (no-op for empty input) rather than replace. A method named
+            "SendMsg" might silently discard errors. You CANNOT know
+            without reading the implementation body.
+
+            - Use grep/search to locate the .cpp file containing the
+              implementation if it is not in the same file as the call.
+            - Follow at least ONE level of call depth for every function
+              involved in the flagged behavior.
+            - If the implementation is in a different file than the call
+              site, you MUST read that other file. Do not skip it.
+
+         c. Read the spec file to understand the exact requirement.
+
+         d. With full knowledge of the implementation, reclassify:
+            - **confirmed** — the violation is real. The code genuinely
+              violates the spec even after reading the implementation.
+            - **false_positive** — the code is actually compliant. Explain
+              WHY the SCAN assessment was wrong and what implementation
+              detail proves compliance (e.g., "SCAN assumed SetX replaces
+              data, but SetX implementation at File.cpp:42 uses
+              m_stream << str which appends — empty input is a no-op,
+              so recovered data is preserved").
+            - **inconclusive** — cannot determine even after reading the
+              implementation (e.g., depends on runtime state, external
+              system, or configuration not visible in code).
+
+         e. For confirmed violations: preserve the original SCAN data
+            (file, line, snippet, explanation) and add your verification
+            note explaining what you checked.
+
+         f. For confirmed violations when suggest_fixes is enabled:
+            provide a concrete fix suggestion based on your deeper
+            understanding of the implementation. If SCAN already suggested
+            a fix, evaluate whether it is correct given the actual
+            implementation — amend or replace if needed.
+
+         g. Print a one-line status: "[N/M] spec_id — verified_status"
+
+      3. Produce a verified-results JSON with:
+         - total_violations_reviewed: count
+         - total_partials_reviewed: count
+         - reclassification_summary:
+           - confirmed: count
+           - false_positive: count
+           - inconclusive: count
+         - findings: array of ALL reviewed items, each with:
+           - spec_id, requirement, severity, impact
+           - original_status (from SCAN: "violation" or "partial")
+           - verified_status ("confirmed", "false_positive", "inconclusive")
+           - file_path, line_number, code_snippet (from SCAN)
+           - scan_explanation (original SCAN reasoning)
+           - verification_note (your deeper analysis — WHY you confirmed
+             or reclassified, what implementation detail you found)
+           - suggested_fix (only for confirmed items when suggest_fixes
+             is enabled)
+         - compliant_passthrough: array of spec_ids that SCAN marked as
+           "compliant" — these are NOT re-verified, just passed through
+         - unverifiable_passthrough: array of spec_ids that SCAN marked as
+           "unverifiable" — these are NOT re-verified, just passed through
+
+      4. Print a brief verification summary to the chat:
+         "Verified N violations + M partials. Confirmed: X, False positives: Y, Inconclusive: Z."
+    inputs:
+      - path: "data/scans/{run_id}-*-scan-result.json"
+        inject: reference
+    outputs:
+      - path: "data/{run_id}-verified-results.json"
+
+  # ──────────────────────────────────────────────
+  # Step 4: REPORT
+  # Consolidate all scan results into a final
+  # structured, actionable audit report.
+  # ──────────────────────────────────────────────
+  - name: report
+    spec_check: false
+    goal: >
+      Consolidate all results into a single, structured, actionable
+      audit report.
+
+      **CRITICAL: This is a READ-ONLY step. Do NOT modify any files outside
+      the workflow data directory.**
+
+      **Data sources — check which are available:**
+
+      - **Verified results** (from VERIFY step): Read the verified-results
+        JSON if it exists and does NOT contain {"skipped": true}. When
+        present, use verified_status instead of SCAN's original status
+        for all violations/partials. Exclude items reclassified as
+        "false_positive" from violation counts. Mark "inconclusive" items
+        separately. Note in the report header: "Findings verified by
+        orchestrator."
+      - **Raw scan results** (from SCAN step): Always read these for
+        compliant and unverifiable items, and as fallback if verified
+        results are not available or skipped (orchestrator_verify was
+        false). Note in report header: "Findings NOT verified — raw scan
+        results only."
+
+      **Step-by-step:**
+
+      1. Read the verified-results JSON (if exists) and all scan result
+         files from data/scans/.
+      2. Aggregate statistics:
+         - Total specs checked across all domains
+         - Total requirements checked
+         - Total violations, partials, unverifiable, compliant
+         - Compliance rate: (compliant / total_checked) * 100
+         - Breakdown by severity: MUST violations, SHOULD violations,
+           MAY violations
+
+      3. Group violations by severity (MUST first, then SHOULD, then MAY).
+         Within each severity group, order by impact
+         (critical > moderate > minor).
+
+      4. For each violation, include:
+         - spec_id, requirement text, severity, impact
+         - file path, line number, code snippet
+         - explanation of the violation
+         - suggested_fix (only if suggest_fixes mode was enabled)
+
+      5. Produce domain-level summaries:
+         - Per domain: compliance rate, number of violations, top issues
+         - Identify "cleanest" domain (highest compliance) and
+           "most problematic" domain (lowest compliance)
+
+      6. Generate actionable recommendations:
+         - Priority 1: MUST violations with critical impact — these are bugs
+         - Priority 2: MUST violations with moderate impact
+         - Priority 3: SHOULD violations
+         - Priority 4: Partial compliance items
+         - For each priority level: list affected specs
+
+      7. Write the audit report JSON to the specified output path.
+         Include top-level "target_scope" (the scope param value: e.g.,
+         "astro", "generic", or "all") and "scopes_audited" (array of
+         scope ids actually processed). These enable the audit-viewer
+         tool to display the audit context in its header. Note: do NOT
+         reuse the existing "scope" object field — that is audit BREADTH
+         (total_specs, total_domains, filters) and is unrelated.
+
+      8. Print a human-readable SUMMARY to the chat:
+
+         ── SPEC AUDIT REPORT ──
+         Date: {date}
+         Scope: {scope param} → {scopes_audited list}
+         Coverage: {N} specs across {M} domains
+         Filters: {applied filters}
+
+         COMPLIANCE OVERVIEW:
+         Compliant: N (X%)
+         Violations: N
+         Partial: N
+         Unverifiable: N
+
+         VIOLATIONS BY SEVERITY:
+         MUST:   N violations (N critical, N moderate, N minor)
+         SHOULD: N violations
+         MAY:    N violations
+
+         TOP ISSUES:
+         1. [MUST/critical] {spec_id}: {brief description} — {file}:{line}
+         2. ...
+         (up to 10)
+
+         PER-DOMAIN SUMMARY:
+         {domain}: {compliance%} — {N violations}
+         ...
+
+         NEXT STEPS:
+         - Fix N MUST/critical violations (highest priority)
+         - Review N partial compliance items
+         - Run /run-workflow spec-enforcement to auto-fix specific violations
+    subagent: true
+    inputs:
+      - path: "data/{run_id}-verified-results.json"
+        inject: file_if_exists
+      - path: "data/scans/{run_id}-*-scan-result.json"
+        inject: reference
+      - path: "data/{run_id}-discovery-plan.json"
+        inject: reference
+    outputs:
+      - path: "data/{run_id}-audit-report.json"
+        struct: audit-report

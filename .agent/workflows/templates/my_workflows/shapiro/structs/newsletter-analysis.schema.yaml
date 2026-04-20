@@ -1,0 +1,48 @@
+name: newsletter-analysis
+version: 2
+description: >
+  Validates the newsletter analysis step output. Contains a list of
+  updated narrative files with their current consensus and processing details.
+type: object
+
+required:
+  - analyzed_at
+  - newsletters_found
+  - newsletters_read
+  - narratives
+
+properties:
+  analyzed_at:
+    type: string
+    description: "ISO timestamp of when the analysis ran"
+  newsletters_found:
+    type: integer
+  newsletters_read:
+    type: integer
+  narratives:
+    type: array
+    items:
+      type: object
+      required:
+        - symbol
+        - action
+        - consensus_direction
+        - consensus_strength
+        - newsletters_processed
+      properties:
+        symbol:
+          type: string
+        action:
+          type: string
+          enum: [created, updated, marked_stale, unchanged]
+        consensus_direction:
+          type: string
+          enum: [BULLISH, BEARISH, NEUTRAL]
+        consensus_strength:
+          type: number
+        newsletters_processed:
+          type: integer
+
+file_checks:
+  exists: true
+  min_size: 50

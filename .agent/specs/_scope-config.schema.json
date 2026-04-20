@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://agentic-control-plane/schemas/_scope-config.schema.json",
+  "title": "Scope configuration",
+  "description": "Project-level declaration of available scopes for behavioral specs. Optional file — when absent, only the implicit 'generic' scope is available.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "scopes": {
+      "type": "array",
+      "description": "Declared scopes beyond the implicit 'generic'. Order is not significant.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Unique scope identifier. Must be lowercase, starting with a letter, containing only letters/digits/hyphens. Doubles as the directory name under .agent/specs/.",
+            "not": { "const": "generic" }
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable description of what the scope represents (e.g., 'Astro VLT integration (AK2API 1.8.x)'). Displayed in CLI output and error messages. Optional — defaults to id."
+          }
+        }
+      }
+    },
+    "default_active_scope": {
+      "type": ["string", "null"],
+      "description": "Team-level default active scope used when no user override (.agent/local/active-scope) is present. Must be either 'generic' or an id declared in 'scopes'. Null/omitted means 'generic' is the fallback."
+    }
+  }
+}

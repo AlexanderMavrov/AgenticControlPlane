@@ -7,5 +7,21 @@
       "Edit",
       "Write"
     ]
+  },
+  "env": {
+    "MAX_MCP_OUTPUT_TOKENS": "50000"
+  },
+  "hooks": {
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .agent/scripts/gate-check.py"
+          }
+        ]
+      }
+    ]
   }
 }

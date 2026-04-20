@@ -1,0 +1,86 @@
+name: spec-write-and-implement
+version: 6
+description: >
+  Write or update a behavioral spec, then implement it in code.
+  Delegates to spec-write (discover, clarify, write, register-spec)
+  then to spec-enforcement (check-specs, implement, verify, register).
+  Triggered by [spec::ComponentName] pattern, [spec] pattern (auto-discovery),
+  or explicitly via /run-workflow.
+
+params:
+  - name: scope
+    description: >
+      Target scope for the spec (e.g., "astro", "ares", "generic").
+      Passed through to both spec-write and spec-enforcement. Default:
+      "generic" — safe for projects without _scope-config.json.
+    required: false
+    default: "generic"
+
+  - name: component
+    description: >
+      Component/subsystem/convention name (e.g., EditField, nvram, exit-code).
+      If not provided, spec-write enters auto-discovery mode.
+    required: false
+
+  - name: domain
+    description: >
+      Logical domain for the spec (e.g., ui, messaging, protocol).
+      If not provided, determined during spec-write.
+    required: false
+
+  - name: requirements
+    description: >
+      Initial requirements text from the user's message.
+      Will be refined in the CLARIFY step of spec-write.
+    required: false
+
+  - name: implement
+    description: >
+      Whether to implement the spec in code after writing it.
+      Set to "false" if only creating/updating the spec without code changes.
+    required: false
+    default: "true"
+
+gate:
+  structural: true
+  semantic: true
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+steps:
+  # ──────────────────────────────────────────────
+  # Step 1: WRITE (delegate to spec-write)
+  # Discover overlaps, clarify requirements,
+  # write spec file, register in _index.json.
+  # ──────────────────────────────────────────────
+  - name: write
+    delegate_to: spec-write
+    subagent: false
+    params:
+      scope: "{scope}"
+      component: "{component}"
+      domain: "{domain}"
+      requirements: "{requirements}"
+    param_bindings:
+      component: "data/approved-requirements.json::component"
+      domain: "data/approved-requirements.json::domain"
+
+  # ──────────────────────────────────────────────
+  # Step 2: ENFORCE (delegate to spec-enforcement)
+  # Implement code, verify, register in _registry.json.
+  # Skipped if implement=false.
+  # ──────────────────────────────────────────────
+  - name: enforce
+    subagent: false
+    goal: >
+      IF the "implement" param is "false": skip this step entirely.
+
+      OTHERWISE: delegate to spec-enforcement to implement the spec in code,
+      verify no other specs are violated, and register the implementation.
+    delegate_to: spec-enforcement
+    params:
+      scope: "{scope}"
+      component: "{component}"
+      domain: "{domain}"
+      spec_path: ".agent/specs/{scope}/{domain}/{component}.md"

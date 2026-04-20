@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflow Trace Viewer</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --bg-card: #ffffff;
+    --bg-hover: #eef0f5;
+    --bg-section: #f8f9fb;
+    --text: #1c1f2e;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --border: #c2c9d6;
+    --border-light: #b8bfce;
+    --accent: #4a6fe8;
+    --accent-light: #eaeffb;
+    --green:    #2f9e5a;   --green-bg:   #edf7f2;
+    --red:      #d94747;   --red-bg:     #fdeaea;
+    --amber:    #b87316;   --amber-bg:   #fef5e4;
+    --blue:     #3878c2;   --blue-bg:    #e8f0fb;
+    --purple:   #7048c8;   --purple-bg:  #f0ebff;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+    --radius: 12px;
+    --radius-sm: 7px;
+    --radius-xs: 4px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+  [data-theme="dark"] {
+    --bg: #0d1117;
+    --bg-card: #161b22;
+    --bg-hover: #1e242c;
+    --bg-section: #1a2030;
+    --text: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6a7585;
+    --border: #2d343d;
+    --border-light: #252c36;
+    --accent: #7090f4;
+    --accent-light: #131e40;
+    --green:    #52c880;   --green-bg:   #0d2618;
+    --red:      #e87070;   --red-bg:     #2d1010;
+    --amber:    #d4963a;   --amber-bg:   #261a00;
+    --blue:     #6aa8e8;   --blue-bg:    #0c1f36;
+    --purple:   #a882e8;   --purple-bg:  #1a1030;
+    --shadow: 0 1px 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .header-logo { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+  .header-logo span { opacity: 0.45; font-weight: 400; margin-left: 2px; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: var(--font);
+  }
+  .btn:hover { background: var(--bg-hover); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .btn-primary:hover { opacity: 0.88; background: var(--accent); }
+
+  /* ── Drop zone ─────────────────────────────────────── */
+  .drop-zone {
+    max-width: 640px;
+    margin: 80px auto;
+    padding: 60px 40px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    text-align: center;
+    transition: all 0.2s;
+    background: var(--bg-card);
+    box-shadow: var(--shadow);
+  }
+  .drop-zone.dragover { border-color: var(--accent); background: var(--accent-light); }
+  .drop-zone h2 { font-size: 18px; margin-bottom: 8px; font-weight: 600; }
+  .drop-zone p { color: var(--text-secondary); font-size: 13px; margin-bottom: 20px; }
+  .drop-zone input[type="file"] { display: none; }
+
+  /* ── Main ──────────────────────────────────────────── */
+  .main { max-width: 920px; margin: 0 auto; padding: 24px; }
+
+  /* ── Workflow card ─────────────────────────────────── */
+  .wf-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .wf-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .wf-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .wf-name { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .wf-version {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .wf-meta { margin-top: 7px; font-size: 12px; color: var(--text-secondary); display: flex; gap: 18px; flex-wrap: wrap; }
+  .wf-meta strong { color: var(--text); font-weight: 600; }
+
+  /* Card sections */
+  .wf-section {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .wf-section:last-child { border-bottom: none; }
+  .wf-section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 9px;
+  }
+
+  /* Description */
+  .wf-description {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ── Param table ───────────────────────────────────── */
+  .param-table { display: flex; flex-direction: column; }
+  .param-row {
+    display: flex;
+    gap: 0;
+    align-items: flex-start;
+  }
+  .param-row + .param-row { border-top: 1px solid var(--border-light); }
+  .param-name {
+    width: 140px;
+    min-width: 100px;
+    flex-shrink: 0;
+    padding: 9px 16px 9px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    line-height: 1.4;
+  }
+  .param-value-cell { flex: 1; padding: 9px 0; min-width: 0; }
+  .param-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .param-value.unset { color: var(--text-muted); font-style: italic; font-weight: 400; }
+  .param-desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
+
+  /* ── Gate chips ────────────────────────────────────── */
+  .wf-bottom-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .wf-bottom-col { flex: 0 0 auto; }
+  .wf-bottom-col-right { flex: 0 0 auto; margin-left: auto; }
+
+  .gate-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+  .gate-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid transparent;
+  }
+  .gate-chip-on  { background: var(--green-bg); color: var(--green); }
+  .gate-chip-off { background: var(--bg-hover); color: var(--text-muted); border-color: var(--border-light); }
+  .gate-chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .gate-chip-on  .gate-chip-dot { background: var(--green); }
+  .gate-chip-off .gate-chip-dot { background: var(--text-muted); }
+  .gate-retries { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Tooltips ── */
+  [data-tip] {
+    cursor: pointer;
+  }
+  .tip-hint {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    color: var(--bg-card);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    font-family: var(--sans);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: opacity 0.1s;
+  }
+  .tip-popup {
+    position: fixed;
+    background: var(--text);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    white-space: normal;
+    max-width: 340px;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    pointer-events: none;
+    animation: tipFadeIn 0.12s ease-out;
+  }
+  @keyframes tipFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Context */
+  .context-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .context-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    padding: 4px 11px;
+    background: var(--blue-bg);
+    color: var(--blue);
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .context-chip-key { opacity: 0.75; }
+  .context-chip-val { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+
+  /* ── Stats ─────────────────────────────────────────── */
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+  .stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .stat-val { font-weight: 700; font-size: 20px; line-height: 1; }
+  .stat-label { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Status pill ───────────────────────────────────── */
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .pill-completed     { background: var(--green-bg);  color: var(--green);  }
+  .pill-failed        { background: var(--red-bg);    color: var(--red);    }
+  .pill-in_progress,
+  .pill-in-progress   { background: var(--blue-bg);   color: var(--blue);   }
+  .pill-paused        { background: var(--amber-bg);  color: var(--amber);  }
+  .pill-pending       { background: var(--bg-hover);  color: var(--text-secondary); }
+
+  /* ── Orchestration panel ──────────────────────────── */
+  .orch-panel { margin-bottom: 20px; }
+  .orch-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; cursor: pointer; user-select: none;
+  }
+  .orch-header:hover { background: var(--bg-hover); border-radius: var(--radius); }
+  .orch-header .step-chevron {
+    font-size: 10px; color: var(--text-muted);
+    transition: transform 0.2s;
+  }
+  .orch-panel.open .orch-header .step-chevron { transform: rotate(90deg); }
+  .orch-title { font-size: 14px; font-weight: 600; }
+  .orch-meta { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+  .orch-body {
+    display: none; padding: 4px 20px 16px;
+    border-top: 1px solid var(--border-light);
+  }
+  .orch-panel.open .orch-body { display: block; }
+  .orch-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0; font-size: 13px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .orch-row:last-child { border-bottom: none; }
+  .orch-row-fail { background: var(--red-bg); border-radius: var(--radius-xs); padding: 5px 6px; }
+  .orch-time { font-family: var(--mono); font-size: 11px; color: var(--text-muted); min-width: 70px; }
+  .orch-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .orch-dot-blue   { background: var(--blue); }
+  .orch-dot-purple { background: var(--purple); }
+  .orch-dot-green  { background: var(--green); }
+  .orch-dot-amber  { background: var(--amber); }
+  .orch-dot-gray   { background: var(--text-muted); }
+  .orch-dot-fail   { background: var(--red); }
+  .orch-tool { font-family: var(--mono); font-size: 12px; font-weight: 600; min-width: 140px; }
+  .orch-step { font-size: 12px; color: var(--accent); }
+  .orch-dur { font-size: 11px; color: var(--text-muted); font-family: var(--mono); min-width: 45px; text-align: right; }
+  .orch-summary { font-size: 12px; color: var(--text-secondary); }
+  .orch-error { font-size: 12px; color: var(--red); }
+
+  /* ── Timeline ──────────────────────────────────────── */
+  .timeline {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .timeline-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 700; margin-bottom: 10px; }
+  .timeline-bar { display: flex; height: 32px; border-radius: var(--radius-sm); overflow: hidden; gap: 3px; }
+  .timeline-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.93);
+    cursor: pointer;
+    transition: opacity 0.15s;
+    min-width: 24px;
+    padding: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: var(--radius-xs);
+  }
+  .timeline-seg:hover { opacity: 0.8; }
+  .timeline-seg.completed   { background: var(--green); }
+  .timeline-seg.failed      { background: var(--red); }
+  .timeline-seg.in_progress,
+  .timeline-seg.in-progress { background: var(--blue); }
+  .timeline-seg.paused      { background: var(--amber); }
+  .timeline-seg.pending     { background: var(--border); color: var(--text-secondary); }
+  .timeline-durations { display: flex; gap: 3px; margin-top: 4px; }
+  .timeline-dur {
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Step cards ────────────────────────────────────── */
+  .step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .step-header {
+    padding: 13px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.12s;
+    user-select: none;
+  }
+  .step-header:hover { background: var(--bg-hover); }
+  .step-chevron { width: 16px; height: 16px; transition: transform 0.2s; color: var(--text-muted); flex-shrink: 0; }
+  .step-card.open .step-chevron { transform: rotate(90deg); }
+  .step-index {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-index.completed   { background: var(--green-bg);  color: var(--green);  }
+  .step-index.failed      { background: var(--red-bg);    color: var(--red);    }
+  .step-index.in_progress,
+  .step-index.in-progress { background: var(--blue-bg);   color: var(--blue);   }
+  .step-index.pending     { background: var(--bg-hover);  color: var(--text-secondary); }
+  .step-name  { font-weight: 600; font-size: 14px; font-family: var(--mono); }
+  .step-model { font-size: 11px; color: var(--purple); font-family: var(--mono); padding: 2px 8px; background: var(--purple-bg); border: 1px solid var(--purple); border-radius: 10px; margin-right: auto; opacity: 0.85; }
+  .step-stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
+  .step-stats span { white-space: nowrap; }
+
+  /* Step details */
+  .step-details { display: none; border-top: 1px solid var(--border-light); }
+  .step-card.open .step-details { display: block; }
+
+  .detail-block {
+    padding: 14px 20px 14px 56px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .detail-block:last-child { border-bottom: none; }
+  .detail-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+  }
+
+  /* Step config chips */
+  .step-config-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .step-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid transparent;
+  }
+  .step-chip-key { opacity: 0.75; }
+  .step-chip-on      { background: var(--green-bg);  color: var(--green);  }
+  .step-chip-off     { background: var(--bg-hover);  color: var(--text-muted);  border-color: var(--border-light); }
+  .step-chip-inherit { background: var(--purple-bg); color: var(--purple); }
+  .step-chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .step-chip-on  .step-chip-dot { background: var(--green); }
+  .step-chip-off .step-chip-dot { background: var(--text-muted); }
+
+  /* Gate results */
+  .gate-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .gate-icon { font-size: 13px; }
+  .gate-pass { color: var(--green); }
+  .gate-fail { color: var(--red); }
+  .gate-info { color: var(--text-secondary); font-size: 12px; }
+
+  /* Invocations */
+  .invocation {
+    background: var(--bg-section);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .invocation-header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .invocation-iter { font-weight: 600; font-size: 12px; }
+
+  /* Retry badges */
+  .retry-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .retry-gate { background: var(--amber-bg); color: var(--amber); }
+  .branch-badge { background: var(--blue-bg); color: var(--blue); }
+
+  /* Subagent group (nested view) */
+  .subagent-group {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .subagent-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--bg-section);
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+  }
+  .subagent-header:hover { background: var(--bg-hover); }
+  .subagent-toggle { font-size: 10px; color: var(--text-muted); transition: transform 0.15s; }
+  .subagent-group.open .subagent-toggle { transform: rotate(90deg); }
+  .subagent-label { font-weight: 600; font-size: 12px; }
+  .subagent-body {
+    display: none;
+    padding: 0 14px 8px;
+    border-top: 1px solid var(--border-light);
+  }
+  .subagent-group.open .subagent-body { display: block; }
+  .subagent-children {
+    display: none;
+    padding: 4px 14px 8px 28px;
+    border-top: 1px solid var(--border-light);
+  }
+  .subagent-group.open .subagent-children { display: block; }
+
+  .subagent-time { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+  /* ── Subagent Timeline (Gantt) ── */
+  .gantt-container {
+    margin-top: 8px;
+    padding: 12px 0 4px;
+  }
+  .gantt-axis {
+    position: relative;
+    height: 20px;
+    margin: 0 0 2px 130px;
+    border-bottom: 1px solid var(--border);
+  }
+  .gantt-tick {
+    position: absolute;
+    bottom: 0;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .gantt-tick::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    width: 1px;
+    height: 5px;
+    background: var(--border);
+  }
+  .gantt-row {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    margin: 2px 0;
+  }
+  .gantt-label {
+    width: 130px;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    padding-right: 8px;
+    text-align: right;
+    font-family: var(--mono);
+  }
+  .gantt-track {
+    flex: 1;
+    position: relative;
+    height: 18px;
+    background: var(--bg-section);
+    border-radius: 3px;
+  }
+  .gantt-bar {
+    position: absolute;
+    top: 2px;
+    height: 14px;
+    border-radius: 3px;
+    min-width: 3px;
+    transition: opacity 0.15s;
+  }
+  .gantt-bar:hover {
+    opacity: 0.85;
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .gantt-bar-pass   { background: var(--green); }
+  .gantt-bar-fail   { background: var(--red); }
+  .gantt-bar-retry  { background: var(--amber); opacity: 0.5; }
+  .gantt-bar-text {
+    position: absolute;
+    top: 0;
+    left: 6px;
+    line-height: 14px;
+    font-size: 9px;
+    font-family: var(--mono);
+    color: #fff;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .gantt-legend {
+    display: flex;
+    gap: 14px;
+    margin: 8px 0 0 130px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .gantt-legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 3px;
+    vertical-align: middle;
+  }
+
+  .gate-retry-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-light);
+  }
+  .gate-retry-row:last-child { border-bottom: none; }
+
+  /* ── Attempt blocks within subagent ── */
+  .attempt-block {
+    border-top: 1px solid var(--border-light);
+    padding: 10px 14px;
+    position: relative;
+  }
+  .attempt-block:first-child { border-top: none; }
+  .attempt-block-retry {
+    background: color-mix(in srgb, var(--amber) 15%, var(--bg-card));
+    border-left: 3px solid var(--amber);
+  }
+  .attempt-block-pass {
+    background: color-mix(in srgb, var(--green) 15%, var(--bg-card));
+    border-left: 3px solid var(--green);
+  }
+  .attempt-block-fail {
+    background: color-mix(in srgb, var(--red) 15%, var(--bg-card));
+    border-left: 3px solid var(--red);
+  }
+  .attempt-header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .attempt-label {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .attempt-label-primary { background: var(--blue-bg); color: var(--blue); }
+  .attempt-label-retry { background: var(--blue-bg); color: var(--blue); }
+  .attempt-stats {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* ── Gate section (separated from invocation body) ── */
+  .gate-section {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+    background: var(--bg-section);
+  }
+  .gate-section-pass {
+    border-color: var(--green);
+    border-left-width: 3px;
+  }
+  .gate-section-fail {
+    border-color: var(--red);
+    border-left-width: 3px;
+  }
+  .gate-header-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .gate-type-label {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Feedback arrow (gate → next retry) ── */
+  .feedback-arrow {
+    margin: 6px 0 2px;
+    padding: 6px 12px;
+    background: var(--amber-bg);
+    border: 1px dashed var(--amber);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    color: var(--amber);
+    position: relative;
+  }
+  .feedback-arrow::before {
+    content: '↓ feedback sent to next attempt';
+    display: block;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    opacity: 0.7;
+  }
+  .feedback-arrow-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  /* Invocation detail sections */
+  .inv-meta { display: flex; gap: 12px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  .inv-meta-item { font-size: 11px; color: var(--text-muted); }
+  .inv-meta-item strong { color: var(--text-secondary); font-weight: 600; }
+  .inv-expandable {
+    margin-top: 8px;
+    border-top: 1px solid var(--border-light);
+    padding-top: 8px;
+  }
+  .inv-expandable summary {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+  }
+  .inv-expandable summary:hover { text-decoration: underline; }
+  .inv-prompt-text, .inv-summary-text {
+    margin-top: 6px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xs);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    color: var(--text-secondary);
+  }
+  .retry-step { background: var(--blue-bg);  color: var(--blue);  }
+
+  /* Warnings banner */
+  .warnings-banner {
+    background: var(--amber-bg);
+    border: 1px solid var(--amber);
+    border-left-width: 4px;
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    margin: 12px 0;
+  }
+  .warnings-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--amber);
+    margin-bottom: 6px;
+  }
+  .warnings-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .warnings-list li { margin-bottom: 2px; }
+
+  /* Gate failure */
+  .gate-failure-detail {
+    margin-top: 8px;
+    background: var(--red-bg);
+    border: 1px solid var(--red);
+    border-left-width: 3px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .gate-failure-header {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--red);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .gate-failure-header:hover { opacity: 0.8; }
+  .gate-failure-toggle { font-size: 9px; transition: transform 0.15s; }
+  .gate-failure-detail.open .gate-failure-toggle { transform: rotate(90deg); }
+  .gate-failure-body {
+    display: none;
+    padding: 0 12px 8px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--red);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .gate-failure-detail.open .gate-failure-body { display: block; }
+
+  /* Goal text */
+  .goal-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--bg-section);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.65;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  /* IO paths */
+  .io-group + .io-group { margin-top: 10px; }
+  .io-group-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+  .io-list { list-style: none; font-size: 12px; }
+  .io-list li { padding: 3px 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .io-path { font-family: var(--mono); color: var(--text-secondary); font-size: 11px; }
+  .io-tag {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 500;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+  }
+
+  /* Modified files */
+  .file-list { list-style: none; font-family: var(--mono); font-size: 11px; margin-top: 6px; }
+  .file-list li { padding: 2px 0; color: var(--text-secondary); }
+  .file-list li::before { content: '↳ '; color: var(--text-muted); }
+
+  /* Details/summary */
+  details { margin-top: 4px; }
+  details summary { font-size: 12px; color: var(--accent); cursor: pointer; user-select: none; }
+  details summary:hover { text-decoration: underline; }
+  details[open] summary { margin-bottom: 6px; }
+
+  /* Timing */
+  .timing-row { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); }
+  .timing-row strong { color: var(--text); }
+
+  /* Summary */
+  .summary-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+  /* ── Tool call rows (per-step) ───────────────────── */
+  .tool-call-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 12px; flex-wrap: wrap; }
+  .tool-call-name { font-weight: 600; color: var(--purple); }
+  .tool-call-source { font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600; text-transform: uppercase; }
+  .tool-call-source-script { background: var(--green-bg); color: var(--green); }
+  .tool-call-source-mcp { background: var(--purple-bg); color: var(--purple); }
+  .tool-call-args { font-family: var(--mono); font-size: 10px; color: var(--text-secondary); }
+  .tool-call-preview { font-family: var(--mono); font-size: 10px; color: var(--text-muted); background: var(--bg-section); padding: 3px 8px; border-radius: 4px; margin: 2px 0 2px 20px; max-height: 40px; overflow: hidden; cursor: pointer; white-space: pre-wrap; word-break: break-all; }
+  .tool-call-preview.expanded { max-height: none; }
+  .tool-calls-section { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-light); }
+  .tool-calls-section-title { font-size: 11px; font-weight: 600; color: var(--purple); margin-bottom: 4px; }
+  .tool-warning-box { background: var(--amber-bg); border: 1px solid var(--amber); border-radius: var(--radius-sm); padding: 8px 12px; margin: 6px 0; }
+  .tool-warning-row { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: var(--amber); padding: 3px 0; }
+  .tool-warning-icon { flex: 0 0 auto; font-size: 14px; line-height: 1; }
+  .tool-warning-text { flex: 1; }
+  .tool-warning-tool { font-weight: 600; }
+  .tool-warning-type { font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600; text-transform: uppercase; background: var(--amber-bg); border: 1px solid var(--amber); }
+  .timeline-tc-marker { width: 6px; height: 6px; border-radius: 50%; position: absolute; top: 50%; transform: translateY(-50%); cursor: pointer; z-index: 2; opacity: 0.9; }
+  .timeline-tc-marker:hover { opacity: 1; transform: translateY(-50%) scale(1.5); }
+  .timeline-tc-marker-script { background: var(--green); }
+  .timeline-tc-marker-mcp { background: var(--purple); }
+
+  /* Utility */
+  .hidden { display: none !important; }
+  .mono { font-family: var(--mono); }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-logo">Trace Viewer <span>| Agentic Control Plane</span> <span style="font-size:10px;opacity:0.35">v2.3 (2026-04-04)</span></div>
+    <div class="header-actions">
+      <button class="btn hidden" id="btnLoad" onclick="document.getElementById('fileInput').click()">Load Trace</button>
+      <input type="file" id="fileInput" accept=".json,.trace.json">
+      <button class="btn" id="btnTheme" onclick="toggleTheme()">Dark</button>
+    </div>
+  </div>
+
+  <div id="dropZone" class="drop-zone">
+    <h2>Load a Trace File</h2>
+    <p>Drag & drop a <code>.trace.json</code> file here, or click to browse</p>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Choose File</button>
+  </div>
+
+  <div id="content" class="main hidden"></div>
+
+  <script>
+    // ─── State ───────────────────────────────────────────
+    let trace = null;
+
+    // ─── Theme ───────────────────────────────────────────
+    function toggleTheme() {
+      const d = document.documentElement;
+      const dark = d.getAttribute('data-theme') === 'dark';
+      d.setAttribute('data-theme', dark ? 'light' : 'dark');
+      document.getElementById('btnTheme').textContent = dark ? 'Dark' : 'Light';
+    }
+
+    // ─── File loading ─────────────────────────────────────
+    const dz = document.getElementById('dropZone');
+    const fi = document.getElementById('fileInput');
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault(); dz.classList.remove('dragover');
+      if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+    });
+    dz.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') fi.click(); });
+    fi.addEventListener('change', () => { if (fi.files.length) loadFile(fi.files[0]); });
+
+    function loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { trace = JSON.parse(e.target.result); render(); }
+        catch (err) { alert('Invalid JSON: ' + err.message); }
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    // ─── Formatting helpers ───────────────────────────────
+    function fmtDuration(ms) {
+      if (ms == null) return '--';
+      if (ms < 1000) return ms + 'ms';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      const m = Math.floor(s / 60), rs = s % 60;
+      if (m < 60) return m + 'm' + (rs ? ' ' + rs + 's' : '');
+      const h = Math.floor(m / 60), rm = m % 60;
+      return h + 'h' + (rm ? ' ' + rm + 'm' : '');
+    }
+    function fmtTime(iso) {
+      if (!iso) return '--';
+      try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+      catch { return iso; }
+    }
+    function fmtDate(iso) {
+      if (!iso) return '--';
+      try { return new Date(iso).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }); }
+      catch { return iso; }
+    }
+    function statusClass(s) { return (s || 'pending').replace(/_/g, '-'); }
+
+    const chevronSVG = `<svg class="step-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>`;
+
+    // ─── Render ───────────────────────────────────────────
+    function render() {
+      document.getElementById('dropZone').classList.add('hidden');
+      document.getElementById('btnLoad').classList.remove('hidden');
+      const c = document.getElementById('content');
+      c.classList.remove('hidden');
+      c.innerHTML = renderCard() + renderOrchestration() + renderToolCalls() + renderTimeline() + renderSteps();
+    }
+
+    // ── Workflow card ─────────────────────────────────────
+    function renderCard() {
+      const t = trace;
+      const sc = statusClass(t.status);
+
+      // Header row
+      const headerHtml = `<div class="wf-header">
+        <div class="wf-title-row">
+          <span class="wf-name">${esc(t.workflow || 'Unknown')}</span>
+          <span class="wf-version">v${t.workflow_version || '?'}</span>
+          <span class="pill pill-${sc}">${esc(t.status || 'unknown')}</span>
+        </div>
+        <div class="wf-meta">
+          <span>Run: <strong class="mono">${esc(t.run_id || '--')}</strong></span>
+          <span>Started: <strong>${fmtDate(t.started_at)} ${fmtTime(t.started_at)}</strong></span>
+          <span>Duration: <strong>${fmtDuration(t.total_duration_ms)}</strong></span>
+        </div>
+      </div>`;
+
+      // Description section (optional)
+      let descHtml = '';
+      if (t.description) {
+        descHtml = `<div class="wf-section">
+          <div class="wf-section-label">Description</div>
+          <div class="wf-description">${esc(t.description.trim())}</div>
+        </div>`;
+      }
+
+      // Parameters section
+      let paramsHtml = '';
+      const params = t.params || {};
+      const paramKeys = Object.keys(params);
+      if (paramKeys.length) {
+        const defs = {};
+        (t.param_defs || []).forEach(d => { defs[d.name] = d; });
+
+        const rows = paramKeys.map(k => {
+          const v = params[k];
+          const def = defs[k];
+          const isUnset = v == null;
+          const valHtml = isUnset
+            ? `<div class="param-value unset">(not set)</div>`
+            : `<div class="param-value">${esc(String(v))}</div>`;
+          const descHtml = (def && def.description)
+            ? `<div class="param-desc">${esc(def.description.trim())}</div>`
+            : '';
+          return `<div class="param-row">
+            <div class="param-name">${esc(k)}</div>
+            <div class="param-value-cell">${valHtml}${descHtml}</div>
+          </div>`;
+        }).join('');
+
+        paramsHtml = `<div class="wf-section">
+          <div class="wf-section-label">Parameters</div>
+          <div class="param-table">${rows}</div>
+        </div>`;
+      }
+
+      // Gate config (optional)
+      let gateColHtml = '';
+      const gc = t.gate_config;
+      if (gc) {
+        const gateTips = {
+          structural: 'Validates outputs against struct schemas: file existence, field types, required fields, patterns. Deterministic, fast. Run by gate-check.py.',
+          semantic: 'LLM evaluates output completeness, correctness and coherence. Slower but catches quality issues that structural checks miss.',
+          human: 'Requires explicit user approval before proceeding. Used for critical decision points.'
+        };
+        const chips = ['structural', 'semantic', 'human'].map(name => {
+          const on = gc[name];
+          const cls = on ? 'gate-chip gate-chip-on' : 'gate-chip gate-chip-off';
+          return `<span class="${cls}" data-tip="${esc(gateTips[name])}"><span class="gate-chip-dot"></span>${esc(name)}</span>`;
+        }).join('');
+        gateColHtml = `<div class="wf-bottom-col">
+          <div class="wf-section-label">Gate</div>
+          <div class="gate-chips">${chips}</div>
+          <div class="gate-retries"><span data-tip="Max in-place retries per subagent when structural gate fails. Same session, preserved context.">gate retries: ${gc.max_gate_retries ?? 5}</span>&nbsp;&nbsp;·&nbsp;&nbsp;<span data-tip="Max new subagent spawns per step after gate retries are exhausted. Fresh context each time.">step retries: ${gc.max_step_retries ?? 3}</span></div>
+        </div>`;
+      }
+
+      // Context section (optional)
+      let contextColHtml = '';
+      if (t.context && Object.keys(t.context).length) {
+        const ctxTips = {
+          carry_forward: {
+            summary: 'After each step passes, orchestrator writes a summary to context/. Next step receives previous summaries injected into its task prompt. Individual steps can opt out with carry_forward: false.',
+            none: 'No context is passed between steps. Each step starts with only its declared inputs. Individual steps can opt in with carry_forward: true.'
+          }
+        };
+        const chips = Object.entries(t.context).map(([k, v]) => {
+          const tip = (ctxTips[k] && ctxTips[k][v]) || (ctxTips[k] && ctxTips[k].summary) || '';
+          return `<span class="context-chip"${tip ? ` data-tip="${esc(tip)}"` : ''}><span class="context-chip-key">${esc(k)}:</span><span class="context-chip-val">${esc(String(v))}</span></span>`;
+        }).join('');
+        contextColHtml = `<div class="wf-bottom-col">
+          <div class="wf-section-label">Context</div>
+          <div class="context-chips">${chips}</div>
+        </div>`;
+      }
+
+      // Stats
+      const statsHtml = `<div class="wf-bottom-col-right">
+        <div class="wf-section-label">Run Stats</div>
+        <div class="stats">
+          <div class="stat"><span class="stat-val">${t.total_messages ?? '--'}</span><span class="stat-label">messages</span></div>
+          <div class="stat"><span class="stat-val">${t.total_tool_calls ?? '--'}</span><span class="stat-label">tool calls</span></div>
+          <div class="stat"><span class="stat-val">${t.total_modified_files ?? '--'}</span><span class="stat-label">files</span></div>
+          <div class="stat"><span class="stat-val">${(t.steps || []).length}</span><span class="stat-label">steps</span></div>
+          ${t.total_mcp_calls ? `<div class="stat"><span class="stat-val">${t.total_mcp_calls}</span><span class="stat-label">MCP calls</span></div>` : ''}
+          ${t.total_tool_calls_proxy ? `<div class="stat"><span class="stat-val">${t.total_tool_calls_proxy}</span><span class="stat-label">tool calls (proxy)</span></div>` : ''}
+        </div>
+      </div>`;
+
+      const bottomHtml = `<div class="wf-section">
+        <div class="wf-bottom-row">${gateColHtml}${contextColHtml}${statsHtml}</div>
+      </div>`;
+
+      const warningsHtml = renderWarnings(t.warnings);
+      return `<div class="wf-card">${headerHtml}${descHtml}${paramsHtml}${bottomHtml}</div>${warningsHtml}`;
+    }
+
+    function renderWarnings(warnings) {
+      if (!warnings || !warnings.length) return '';
+      const items = warnings.map(w => `<li>${esc(String(w))}</li>`).join('');
+      return `<div class="warnings-banner">
+        <div class="warnings-title">&#9888; Warnings (${warnings.length})</div>
+        <ul class="warnings-list">${items}</ul>
+      </div>`;
+    }
+
+    // ── Orchestration (MCP calls) ────────────────────────
+    function renderOrchestration() {
+      const calls = trace.mcp_calls;
+      if (!calls || !calls.length) return '';
+
+      const totalMs = calls.reduce((s, c) => s + (c.duration_ms || 0), 0);
+
+      const toolColors = {
+        workflow_resolve: 'gray', workflow_init: 'blue', workflow_resume: 'blue',
+        step_begin: 'purple', step_collect_result: 'amber',
+        step_complete: 'green', workflow_finalize: 'blue',
+        list_agent_files: 'gray'
+      };
+
+      const rows = calls.map((c, i) => {
+        const color = toolColors[c.tool] || 'gray';
+        const ok = c.success !== false;
+        const dotCls = ok ? `orch-dot orch-dot-${color}` : 'orch-dot orch-dot-fail';
+        const time = fmtTime(c.timestamp);
+        const dur = c.duration_ms != null ? `${c.duration_ms}ms` : '';
+        const step = c.step ? `<span class="orch-step">${esc(c.step)}</span>` : '';
+        const summary = c.summary ? `<span class="orch-summary">${esc(c.summary)}</span>` : '';
+        const errHtml = c.error ? `<span class="orch-error">${esc(c.error)}</span>` : '';
+        return `<div class="orch-row${ok ? '' : ' orch-row-fail'}">
+          <span class="orch-time">${time}</span>
+          <span class="${dotCls}"></span>
+          <span class="orch-tool">${esc(c.tool)}</span>
+          ${step}
+          <span class="orch-dur">${dur}</span>
+          ${summary}${errHtml}
+        </div>`;
+      }).join('');
+
+      return `<div class="wf-card orch-panel" id="orchPanel">
+        <div class="orch-header" onclick="document.getElementById('orchPanel').classList.toggle('open')">
+          <span class="step-chevron">&#9654;</span>
+          <span class="orch-title">Orchestration</span>
+          <span class="orch-meta">${calls.length} MCP calls &middot; ${totalMs}ms</span>
+        </div>
+        <div class="orch-body">${rows}</div>
+      </div>`;
+    }
+
+    // ── Tool Calls (proxy) ─────────────────────────────────
+    function renderToolCalls() {
+      const calls = trace.tool_calls;
+      if (!calls || !calls.length) return '';
+
+      const totalMs = calls.reduce((s, c) => s + (c.duration_ms || 0), 0);
+      const successes = calls.filter(c => c.success !== false).length;
+
+      const rows = calls.map((c, i) => {
+        const ok = c.success !== false;
+        const dotCls = ok ? 'orch-dot orch-dot-green' : 'orch-dot orch-dot-fail';
+        const time = fmtTime(c.timestamp);
+        const toolName = c.tool_short || c.tool || '?';
+        const sourceLabel = c.source === 'tool_server' ? 'script' : (c.source === 'mcp_transcript' ? 'mcp' : '');
+        const sourceCls = c.source === 'tool_server' ? 'tool-call-source-script' : 'tool-call-source-mcp';
+        const stepBadge = c.step ? `<span class="orch-step">${esc(c.step)}</span>` : '';
+        const dur = c.duration_ms != null ? `<span class="orch-dur">${c.duration_ms}ms</span>` : '';
+        const args = c.arguments && Object.keys(c.arguments).length
+          ? `<span class="tool-call-args">${esc(Object.entries(c.arguments).map(([k,v]) => k + '=' + v).join(', '))}</span>`
+          : '';
+        const errHtml = c.error ? `<span class="orch-error">${esc(c.error)}</span>` : '';
+        const outLen = c.output_length ? `<span class="orch-summary" title="output size">${c.output_length} chars output</span>` : '';
+        const exitCode = c.exit_code != null && c.exit_code !== 0 ? `<span class="orch-error">exit ${c.exit_code}</span>` : '';
+        return `<div class="orch-row${ok ? '' : ' orch-row-fail'}">
+          <span class="orch-time">${time}</span>
+          <span class="${dotCls}"></span>
+          <span class="tool-call-name">${esc(toolName)}</span>
+          ${sourceLabel ? `<span class="tool-call-source ${sourceCls}">${sourceLabel}</span>` : ''}
+          ${stepBadge}
+          ${args}
+          ${dur}
+          ${outLen}${exitCode}${errHtml}
+        </div>`;
+      }).join('');
+
+      return `<div class="wf-card orch-panel" id="toolCallsPanel">
+        <div class="orch-header" onclick="document.getElementById('toolCallsPanel').classList.toggle('open')">
+          <span class="step-chevron">&#9654;</span>
+          <span class="orch-title" style="color:var(--purple)">Tool Calls (all steps)</span>
+          <span class="orch-meta">${calls.length} calls &middot; ${successes} ok &middot; ${totalMs}ms</span>
+        </div>
+        <div class="orch-body">${rows}</div>
+      </div>`;
+    }
+
+    // ── Timeline ──────────────────────────────────────────
+    function renderTimeline() {
+      const steps = trace.steps || [];
+      if (!steps.length) return '';
+      const totalMs = steps.reduce((s, st) => s + (st.duration_ms || 1000), 0);
+
+      const segs = steps.map((st, i) => {
+        const flex = Math.max(3, ((st.duration_ms || 1000) / totalMs) * 100);
+        const cls = statusClass(st.status);
+
+        // Tool call markers within this step segment
+        let markers = '';
+        if (trace.tool_calls && trace.tool_calls.length && st.started_at && st.duration_ms) {
+          const stepStartMs = new Date(st.started_at).getTime();
+          const stepDurMs = st.duration_ms || 1;
+          trace.tool_calls.forEach((tc, tci) => {
+            if (tc.step !== st.name || !tc.timestamp) return;
+            const tcMs = new Date(tc.timestamp).getTime();
+            const pct = Math.max(2, Math.min(98, ((tcMs - stepStartMs) / stepDurMs) * 100));
+            const markerCls = tc.source === 'tool_server' ? 'timeline-tc-marker-script' : 'timeline-tc-marker-mcp';
+            markers += `<span class="timeline-tc-marker ${markerCls}" id="tc-marker-${tci}" style="left:${pct.toFixed(1)}%" title="${esc(tc.tool_short || tc.tool || '?')}" onclick="event.stopPropagation();document.getElementById('tc-detail-${tci}').scrollIntoView({behavior:'smooth',block:'center'})"></span>`;
+          });
+        }
+
+        return `<div class="timeline-seg ${cls}" style="flex:${flex} 1 0;position:relative" onclick="scrollToStep(${i})" title="${esc(st.name)}: ${fmtDuration(st.duration_ms)}">${esc(st.name)}${markers}</div>`;
+      }).join('');
+
+      const durs = steps.map((st) => {
+        const flex = Math.max(3, ((st.duration_ms || 1000) / totalMs) * 100);
+        return `<div class="timeline-dur" style="flex:${flex} 1 0">${fmtDuration(st.duration_ms)}</div>`;
+      }).join('');
+
+      return `<div class="timeline">
+        <div class="timeline-label">Timeline</div>
+        <div class="timeline-bar">${segs}</div>
+        <div class="timeline-durations">${durs}</div>
+      </div>`;
+    }
+
+    // ── Step cards ────────────────────────────────────────
+    function renderSteps() {
+      return (trace.steps || []).map((st, i) => renderStepCard(st, i)).join('');
+    }
+
+    function renderStepCard(st, idx) {
+      const cls = statusClass(st.status);
+      const inv = st.invocations || [];
+      const msgs = inv.reduce((s, v) => s + (v.message_count || 0), 0);
+      const tools = inv.reduce((s, v) => s + (v.tool_call_count || 0), 0);
+      const allFiles = [...new Set(inv.flatMap(v => v.modified_files || []))];
+
+      const lastInv = inv[inv.length - 1];
+      let gateSummary = '';
+      if (lastInv && lastInv.gate) {
+        const g = lastInv.gate;
+        gateSummary = g.passed
+          ? `<span class="gate-pass">&#10003; ${esc(g.type || 'gate')}</span>`
+          : `<span class="gate-fail">&#10007; ${esc(g.type || 'gate')}</span>`;
+      }
+
+      const branchCount = inv.filter(v => v.retry_type === 'branch').length;
+      const totalBranches = branchCount > 0 ? branchCount + 1 : 0;
+      const branchStr = totalBranches > 0
+        ? `<span class="retry-badge branch-badge">${totalBranches} branches</span>` : '';
+      const retryStr = st.retry_count > 0
+        ? `<span>${st.retry_count} retr${st.retry_count !== 1 ? 'ies' : 'y'}</span>` : '';
+
+      // Extract model(s) from invocations for step header
+      const models = [...new Set(inv.map(v => v.model).filter(Boolean))];
+      const modelStr = models.length ? `<span class="step-model">${esc(models.join(', '))}</span>` : '';
+
+      const cfg = st.config || {};
+      const isInline = cfg.subagent === false;
+      const inlineBadge = isInline ? '<span class="tool-call-source tool-call-source-mcp" style="font-size:9px;margin-left:4px" title="Executed by orchestrator (no subagent spawn)">orchestrator</span>' : '';
+
+      // Count tool calls for this step (for inline steps that have no invocations)
+      const stepToolCalls = (trace.tool_calls || []).filter(tc => tc.step === st.name);
+      const toolCallCount = stepToolCalls.length;
+
+      return `<div class="step-card" id="step-${idx}">
+        <div class="step-header" onclick="toggleStep(${idx})">
+          ${chevronSVG}
+          <span class="step-index ${cls}">${idx + 1}</span>
+          <span class="step-name">${esc(st.name)}</span>${inlineBadge}
+          ${modelStr}
+          <div class="step-stats">
+            <span>${fmtDuration(st.duration_ms)}</span>
+            <span>${msgs} msg</span>
+            <span>${tools + toolCallCount} tools</span>
+            ${branchStr}
+            ${retryStr}
+            ${gateSummary}
+            ${(st.tool_warnings && st.tool_warnings.length) ? `<span style="color:var(--amber)" title="${st.tool_warnings.length} tool warning(s)">&#9888;</span>` : ''}
+            <span class="pill pill-${cls}">${esc(st.status || 'pending')}</span>
+          </div>
+        </div>
+        <div class="step-details">
+          ${renderStepConfig(st.config)}
+          ${st.goal ? renderGoal(st.goal) : ''}
+          ${renderStepIO(st.inputs, st.outputs)}
+          ${renderStepTiming(st, inv)}
+          ${renderSubagentTimeline(st, idx)}
+          ${renderInvocations(inv, st.prompt_files)}
+          ${renderToolWarnings(st)}
+          ${renderStepToolCalls(st, idx)}
+          ${renderModifiedFiles(allFiles)}
+          ${st.summary ? `<div class="detail-block"><div class="detail-label">Summary</div><div class="summary-text">${esc(st.summary)}</div></div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    function renderGoal(goal) {
+      return `<div class="detail-block">
+        <div class="detail-label">Goal <span style="font-size:10px;opacity:0.5;text-transform:none;letter-spacing:0;font-weight:400">(from workflow.yaml)</span></div>
+        <div class="goal-text">${esc(goal)}</div>
+      </div>`;
+    }
+
+    function renderStepConfig(cfg) {
+      if (!cfg) return '';
+      const chips = [];
+      const specOn = cfg.spec_check === true;
+      const stepTips = {
+        spec_check: 'When ON, subagent must verify behavioral specs in .agent/specs/ before modifying files. Ensures changes don\'t violate documented requirements.',
+        subagent: 'When ON, step spawns an isolated subagent with fresh context. When OFF, step executes directly in the orchestrator session.',
+      };
+      chips.push(`<span class="step-chip ${specOn ? 'step-chip-on' : 'step-chip-off'}" data-tip="${esc(stepTips.spec_check)}"><span class="step-chip-dot"></span><span class="step-chip-key">spec_check</span></span>`);
+      chips.push(`<span class="step-chip ${cfg.subagent ? 'step-chip-on' : 'step-chip-off'}" data-tip="${esc(stepTips.subagent)}"><span class="step-chip-dot"></span><span class="step-chip-key">subagent</span></span>`);
+
+      // Show effective gate config: merge workflow-level defaults with step overrides
+      const wfGate = trace.gate_config || {};
+      const stepGate = cfg.gate || {};
+      const hasOverride = cfg.gate && Object.keys(cfg.gate).length > 0;
+      ['structural', 'semantic', 'human'].forEach(name => {
+        const isOverride = stepGate[name] != null;
+        const effective = isOverride ? stepGate[name] : (wfGate[name] ?? false);
+        const source = isOverride ? ' (step override)' : ' (from workflow)';
+        const tip = {
+          structural: 'Validate outputs against struct schemas: file existence, field types, required fields, patterns.' + source,
+          semantic: 'LLM evaluates output completeness, correctness and coherence.' + source,
+          human: 'Require explicit user approval before proceeding.' + source,
+        }[name];
+        const overrideMark = isOverride ? ' style="outline:1px dashed var(--accent);outline-offset:1px"' : '';
+        chips.push(`<span class="step-chip ${effective ? 'step-chip-on' : 'step-chip-off'}"${overrideMark} data-tip="${esc(tip)}"><span class="step-chip-dot"></span><span class="step-chip-key">gate.${name}</span></span>`);
+      });
+
+      return `<div class="detail-block"><div class="detail-label">Step Config${hasOverride ? ' <span style="font-size:9px;opacity:0.5;font-weight:400">(dashed = step override)</span>' : ''}</div><div class="step-config-chips">${chips.join('')}</div></div>`;
+    }
+
+    function renderStepTiming(st, invocations) {
+      const bc = (invocations || []).filter(v => v.retry_type === 'branch').length;
+      const tb = bc > 0 ? bc + 1 : 0;
+      return `<div class="detail-block">
+        <div class="detail-label">Timing</div>
+        <div class="timing-row">
+          <span>Started: <strong>${fmtTime(st.started_at)}</strong></span>
+          <span>Completed: <strong>${fmtTime(st.completed_at)}</strong></span>
+          <span>Duration: <strong>${fmtDuration(st.duration_ms)}</strong></span>
+          ${tb > 0 ? `<span>Branches: <strong>${tb}</strong></span>` : ''}
+          <span>Retries: <strong>${st.retry_count || 0}</strong></span>
+        </div>
+      </div>`;
+    }
+
+    function renderGateDetails(invocations) {
+      if (!invocations.length) return '';
+      const rows = invocations.map(inv => {
+        const g = inv.gate;
+        if (!g) return '';
+        const icon = g.passed
+          ? `<span class="gate-icon gate-pass">&#10003;</span>`
+          : `<span class="gate-icon gate-fail">&#10007;</span>`;
+        let detail = `${g.checks || 0} checks, ${g.failures || 0} failures`;
+        if (g.details && g.details.length) {
+          detail += ' &mdash; ' + g.details.slice(0, 3).map(d => esc(String(d))).join('; ');
+          if (g.details.length > 3) detail += ` (+${g.details.length - 3} more)`;
+        }
+        return `<div class="gate-row">
+          ${icon}
+          <span>${esc(g.type || 'structural')}</span>
+          <span class="gate-info">${invocations.length > 1 ? `[iter ${inv.iteration}] ` : ''}${detail}</span>
+        </div>`;
+      }).filter(Boolean).join('');
+      if (!rows) return '';
+      return `<div class="detail-block"><div class="detail-label">Gate Results</div>${rows}</div>`;
+    }
+
+    function groupInvocations(invocations) {
+      // Group invocations by subagent session.
+      // Strategy 1 (preferred): group by subagent_id when available
+      // Strategy 2 (fallback): infer from retry_type sequence
+      const hasIds = invocations.some(inv => inv.subagent_id);
+      if (hasIds) {
+        // Group by subagent_id — accurate even with parallel interleaving
+        const idMap = new Map();
+        const order = [];
+        for (const inv of invocations) {
+          const id = inv.subagent_id || `_anon_${order.length}`;
+          if (!idMap.has(id)) {
+            const g = { primary: inv, retries: [] };
+            idMap.set(id, g);
+            order.push(g);
+          } else {
+            idMap.get(id).retries.push(inv);
+          }
+        }
+        return order;
+      }
+      // Fallback: sequential heuristic (gate retries → preceding non-gate)
+      // Note: may misattribute retries when parallel subagents interleave
+      const groups = [];
+      let current = null;
+      for (const inv of invocations) {
+        const isGateRetry = inv.retry_type === 'gate';
+        if (isGateRetry && current) {
+          current.retries.push(inv);
+        } else {
+          current = { primary: inv, retries: [] };
+          groups.push(current);
+        }
+      }
+      return groups;
+    }
+
+    function extractTaskHint(inv) {
+      // Try to extract a short description of what this subagent does
+      // Priority: description field > parallel_key > first line pattern from task_prompt
+      if (inv.description) return inv.description;
+      if (inv.parallel_key) return inv.parallel_key;
+      const tp = inv.task_prompt || '';
+      // Pattern: "for the **domain** domain"
+      const domainMatch = tp.match(/for the \*\*([^*]+)\*\* domain/);
+      if (domainMatch) return domainMatch[1];
+      // Pattern: "Step N (NAME)"
+      const stepMatch = tp.match(/Step \d+ \(([^)]+)\)/);
+      if (stepMatch) return stepMatch[1].toLowerCase();
+      // Very short prompt = likely phantom/test
+      if (tp.length < 20) return tp || null;
+      return null;
+    }
+
+    function renderSubagentTimeline(st, idx) {
+      const invocations = st.invocations || [];
+      if (!invocations.length) return '';
+      const groups = groupInvocations(invocations);
+      const totalInvocations = groups.reduce((s, g) => s + 1 + g.retries.length, 0);
+
+      const stepStart = new Date(st.started_at).getTime();
+      const stepEnd   = new Date(st.completed_at).getTime();
+      const stepSpan  = stepEnd - stepStart;
+      if (stepSpan <= 0) return '';
+
+      // Compute bar data per subagent group
+      const bars = groups.map((g, gi) => {
+        const inv = g.primary;
+        const lastInv = g.retries.length ? g.retries[g.retries.length - 1] : inv;
+        const finalPassed = lastInv.gate ? lastInv.gate.passed : true;
+        const hasRetries = g.retries.length > 0;
+
+        // Detect phantom invocations (zero duration, toolu_/test- prefix ids)
+        const isPhantom = !inv.duration_ms || inv.duration_ms === 0;
+
+        // Start = completed_at - duration_ms (duration is cumulative from session start)
+        let subStartMs = stepStart;
+        let subEndMs   = stepEnd;
+        if (inv.completed_at && inv.duration_ms) {
+          subStartMs = new Date(inv.completed_at).getTime() - inv.duration_ms;
+        } else if (inv.completed_at) {
+          subStartMs = new Date(inv.completed_at).getTime();
+          subEndMs = subStartMs; // phantom: point in time
+        }
+        if (lastInv.completed_at) {
+          subEndMs = new Date(lastInv.completed_at).getTime();
+        }
+        // Clamp to step range
+        subStartMs = Math.max(subStartMs, stepStart);
+        subEndMs   = Math.min(subEndMs, stepEnd);
+
+        const hint = extractTaskHint(inv) || `#${gi + 1}`;
+        const durationLabel = isPhantom ? '' : fmtDuration(subEndMs - subStartMs);
+
+        return { subStartMs, subEndMs, hint, durationLabel, finalPassed, hasRetries, retries: g.retries, inv, isPhantom, groupIndex: gi };
+      });
+
+      // Show when there's at least 1 real (non-phantom) bar with duration
+      const realBars = bars.filter(b => !b.isPhantom);
+      if (!realBars.length) return '';
+
+      // Time axis ticks — 4-5 marks evenly spaced
+      const tickCount = Math.min(5, Math.max(2, Math.floor(stepSpan / 60000) + 1));
+      let ticks = '';
+      for (let i = 0; i <= tickCount; i++) {
+        const pct = (i / tickCount) * 100;
+        const t = new Date(stepStart + (i / tickCount) * stepSpan);
+        const hh = String(t.getHours()).padStart(2, '0');
+        const mm = String(t.getMinutes()).padStart(2, '0');
+        const ss = String(t.getSeconds()).padStart(2, '0');
+        ticks += `<span class="gantt-tick" style="left:${pct}%">${hh}:${mm}:${ss}</span>`;
+      }
+
+      // Render rows
+      const rows = bars.map(b => {
+        if (b.isPhantom) {
+          // Phantom: thin marker line at the timestamp
+          const posPct = ((b.subStartMs - stepStart) / stepSpan * 100).toFixed(2);
+          return `<div class="gantt-row" style="opacity:0.45;height:18px">
+            <span class="gantt-label" title="${esc(b.hint)} (phantom)" style="font-style:italic;font-size:10px">${esc(b.hint)} <span style="color:var(--text-muted);font-size:9px">(phantom)</span></span>
+            <div class="gantt-track" style="height:10px">
+              <div style="position:absolute;left:${posPct}%;top:1px;width:2px;height:8px;background:var(--text-muted);border-radius:1px" title="Phantom invocation at ${fmtTime(b.inv.completed_at)}"></div>
+            </div>
+          </div>`;
+        }
+
+        // Build bar segments with duration labels on each
+        let barHtml = '';
+        if (b.hasRetries) {
+          // Primary bar (first attempt) — amber if failed (non-final), green if passed
+          if (!b.inv.completed_at) return '';
+          const primEnd = new Date(b.inv.completed_at).getTime();
+          const primLeft = ((b.subStartMs - stepStart) / stepSpan * 100).toFixed(2);
+          const primWidth = ((Math.min(primEnd, b.subEndMs) - b.subStartMs) / stepSpan * 100).toFixed(2);
+          const primPassed = b.inv.gate ? b.inv.gate.passed : true;
+          const primClass = primPassed ? 'gantt-bar-pass' : 'gantt-bar-retry'; // amber for non-final fail
+          const primDur = fmtDuration(b.inv.duration_ms);
+          barHtml += `<div class="gantt-bar ${primClass}" style="left:${primLeft}%;width:${primWidth}%;cursor:pointer" title="Attempt 1: ${primDur}" onclick="scrollToSubagent(${idx}, ${b.groupIndex}, 0);event.stopPropagation()">
+            <span class="gantt-bar-text">${primDur}</span>
+          </div>`;
+
+          // Retry bars — amber for non-final, green/red for last attempt
+          let prevEnd = primEnd;
+          b.retries.forEach((r, ri) => {
+            if (!r.completed_at) return;
+            const rEnd = new Date(r.completed_at).getTime();
+            const rStart = Math.max(prevEnd, b.subStartMs);
+            const rLeft = ((rStart - stepStart) / stepSpan * 100).toFixed(2);
+            const rWidth = ((rEnd - rStart) / stepSpan * 100).toFixed(2);
+            const rPassed = r.gate ? r.gate.passed : true;
+            const isLast = ri === b.retries.length - 1;
+            const rClass = rPassed ? 'gantt-bar-pass' : (isLast ? 'gantt-bar-fail' : 'gantt-bar-retry');
+            const rDur = fmtDuration(rEnd - rStart);
+            barHtml += `<div class="gantt-bar ${rClass}" style="left:${rLeft}%;width:${rWidth}%;cursor:pointer" title="Retry ${ri + 1}: ${rDur}" onclick="scrollToSubagent(${idx}, ${b.groupIndex}, ${ri + 1});event.stopPropagation()">
+              <span class="gantt-bar-text">${rDur}</span>
+            </div>`;
+            prevEnd = rEnd;
+          });
+        } else {
+          const leftPct  = ((b.subStartMs - stepStart) / stepSpan * 100).toFixed(2);
+          const widthPct = ((b.subEndMs - b.subStartMs) / stepSpan * 100).toFixed(2);
+          const cls = b.finalPassed ? 'gantt-bar-pass' : 'gantt-bar-fail';
+          barHtml = `<div class="gantt-bar ${cls}" style="left:${leftPct}%;width:${widthPct}%;cursor:pointer" title="${esc(b.hint)}: ${b.durationLabel}" onclick="scrollToSubagent(${idx}, ${b.groupIndex}, 0);event.stopPropagation()">
+            <span class="gantt-bar-text">${esc(b.durationLabel)}</span>
+          </div>`;
+        }
+
+        return `<div class="gantt-row">
+          <span class="gantt-label" title="${esc(b.hint)}">${esc(b.hint)}</span>
+          <div class="gantt-track">${barHtml}</div>
+        </div>`;
+      }).join('');
+
+      const hasRetries = bars.some(b => b.hasRetries);
+      const legend = `<div class="gantt-legend">
+        <span><span class="gantt-legend-dot" style="background:var(--green)"></span>gate passed</span>
+        ${hasRetries ? '<span><span class="gantt-legend-dot" style="background:var(--amber)"></span>retry (gate failed)</span>' : ''}
+        <span><span class="gantt-legend-dot" style="background:var(--red)"></span>final fail</span>
+        ${bars.some(b => b.isPhantom) ? '<span><span class="gantt-legend-dot" style="background:var(--text-muted)"></span>phantom</span>' : ''}
+        <span style="font-style:italic">Total: ${fmtDuration(stepSpan)}</span>
+      </div>`;
+
+      return `<div class="detail-block">
+        <div class="detail-label">Subagent Timeline (${realBars.length > 1 ? realBars.length + ' parallel' : totalInvocations > 1 ? totalInvocations + ' attempts' : '1 subagent'}${bars.some(b => b.isPhantom) ? ', ' + bars.filter(b => b.isPhantom).length + ' phantom' : ''})</div>
+        <div class="gantt-container">
+          <div class="gantt-axis">${ticks}</div>
+          ${rows}
+          ${legend}
+        </div>
+      </div>`;
+    }
+
+    function _matchBranchPrompt(inv, promptFiles) {
+      // Match invocation to branch prompt by _branch_N in modified_files
+      if (!promptFiles || !promptFiles.length) return null;
+      const files = inv.modified_files || [];
+      for (const f of files) {
+        const m = f.match(/_branch_(\d+)/);
+        if (m) {
+          const bi = parseInt(m[1]);
+          const pf = promptFiles.find(p =>
+            (typeof p === 'object' ? p.branch_index : null) === bi
+          );
+          if (pf) return pf;
+        }
+      }
+      // Fallback: match by invocation index if branches == invocations count
+      return null;
+    }
+
+    function renderAttemptBlock(inv, label, labelClass, isLast, gi, ai, promptFiles) {
+      const gate = inv.gate || {};
+      const gatePassed = gate.passed !== false; // default true if no gate
+      const hasGate = !!inv.gate;
+
+      // Meta
+      const metaItems = [];
+      if (inv.model) metaItems.push(`<span class="inv-meta-item"><strong>Model:</strong> ${esc(inv.model)}</span>`);
+      if (inv.note) metaItems.push(`<span class="inv-meta-item"><strong>Note:</strong> ${esc(inv.note)}</span>`);
+      if (inv.parallel_key) metaItems.push(`<span class="inv-meta-item"><strong>Key:</strong> ${esc(inv.parallel_key)}</span>`);
+      if (inv.subagent_id) metaItems.push(`<span class="inv-meta-item"><strong>ID:</strong> ${esc(inv.subagent_id.substring(0, 8))}…</span>`);
+      const metaHtml = metaItems.length ? `<div class="inv-meta">${metaItems.join('')}</div>` : '';
+
+      // Summary
+      const summaryHtml = inv.subagent_summary
+        ? `<div class="inv-expandable"><details><summary>Subagent Summary</summary><div class="inv-summary-text">${esc(inv.subagent_summary)}</div></details></div>`
+        : '';
+
+      // Task prompt (expandable)
+      const promptHtml = inv.task_prompt
+        ? `<div class="inv-expandable"><details><summary>Task Prompt (orchestrator → subagent)</summary><div class="inv-prompt-text">${esc(inv.task_prompt)}</div></details></div>`
+        : '';
+
+      // Branch prompt (parallel steps — the self-contained prompt file the subagent reads)
+      const branchPrompt = _matchBranchPrompt(inv, promptFiles);
+      let branchPromptHtml = '';
+      if (branchPrompt && typeof branchPrompt === 'object') {
+        const bIdx = branchPrompt.branch_index != null ? branchPrompt.branch_index : '?';
+        const bPath = branchPrompt.path || '';
+        const bContent = branchPrompt.content;
+        const bId = `bp-${gi}-${ai}`;
+        branchPromptHtml = `<div class="inv-expandable"><details><summary>Branch ${bIdx} Prompt <span style="font-size:10px;color:var(--text-muted);font-weight:normal">(self-contained task file read by subagent)</span></summary>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px"><code>${esc(bPath)}</code></div>
+          ${bContent ? `<div class="inv-prompt-text" style="max-height:400px;overflow:auto">${esc(bContent)}</div>` : '<div style="font-size:11px;color:var(--text-muted)">Content not embedded in trace</div>'}
+        </details></div>`;
+      }
+
+      // Transcript
+      const tPath = inv.transcript_path;
+      const transcriptHtml = tPath
+        ? `<div class="inv-meta"><span class="inv-meta-item"><strong>Transcript:</strong> ${esc(tPath)}</span></div>`
+        : '';
+
+      // Modified files
+      const files = inv.modified_files || [];
+      const filesHtml = files.length
+        ? `<details><summary>${files.length} file${files.length !== 1 ? 's' : ''} modified</summary><ul class="file-list">${files.map(f => `<li>${esc(f)}</li>`).join('')}</ul></details>`
+        : '';
+
+      // ── Gate section (visually separated) ──
+      let gateSectionHtml = '';
+      if (hasGate) {
+        const gateIcon = gatePassed
+          ? `<span class="gate-pass">&#10003;</span>`
+          : `<span class="gate-fail">&#10007;</span>`;
+        const gateClass = gatePassed ? 'gate-section-pass' : 'gate-section-fail';
+
+        let gateDetailsHtml = '';
+        if (!gatePassed && gate.details && gate.details.length) {
+          const gfId = 'gf-' + gi + '-' + ai + '-' + Math.random().toString(36).substr(2,5);
+          const allLines = gate.details.map(d => esc(String(d))).join('\n');
+          const count = gate.details.length;
+          gateDetailsHtml = `<div class="gate-failure-detail" id="${gfId}" onclick="document.getElementById('${gfId}').classList.toggle('open');event.stopPropagation()" style="margin-top:6px">
+            <div class="gate-failure-header">
+              <span class="gate-failure-toggle">&#9654;</span>
+              ${count} issue${count !== 1 ? 's' : ''}: ${esc(String(gate.details[0]))}${count > 1 ? ' …' : ''}
+            </div>
+            <div class="gate-failure-body">${allLines}</div>
+          </div>`;
+        }
+
+        gateSectionHtml = `<div class="gate-section ${gateClass}">
+          <div class="gate-header-row">
+            ${gateIcon}
+            <span class="gate-type-label">${esc(gate.type || 'gate')}</span>
+            <span style="font-size:11px;color:var(--text-muted)">${gate.checks || 0} checks, ${gate.failures || 0} failures</span>
+          </div>
+          ${gateDetailsHtml}
+        </div>`;
+      }
+
+      // ── Feedback arrow (only if gate failed and there's a followup) ──
+      let feedbackHtml = '';
+      if (!gatePassed && inv.followup_message && !isLast) {
+        feedbackHtml = `<div class="feedback-arrow" onclick="event.stopPropagation()">
+          <div class="feedback-arrow-text">${esc(inv.followup_message)}</div>
+        </div>`;
+      }
+
+      // Block styling: all attempts get colored left border + tinted bg
+      // amber = gate failed (non-final), green = gate passed, red = final fail
+      let blockClass;
+      if (gatePassed) {
+        blockClass = 'attempt-block-pass';
+      } else if (isLast) {
+        blockClass = 'attempt-block-fail';
+      } else {
+        blockClass = 'attempt-block-retry';
+      }
+
+      // Time range
+      let timeStr = '';
+      if (inv.completed_at && inv.duration_ms) {
+        const endMs = new Date(inv.completed_at).getTime();
+        const startMs = endMs - inv.duration_ms;
+        timeStr = `${fmtTime(new Date(startMs).toISOString())} → ${fmtTime(inv.completed_at)}`;
+      } else if (inv.completed_at) {
+        timeStr = fmtTime(inv.completed_at);
+      }
+
+      return `<div class="attempt-block ${blockClass}" data-group="${gi}" data-attempt="${ai}">
+        <div class="attempt-header">
+          <span class="attempt-label ${labelClass}">${label}</span>
+          <div class="attempt-stats">
+            <span>${fmtDuration(inv.duration_ms)}</span>
+            <span>${inv.message_count || 0} msg</span>
+            <span>${inv.tool_call_count || 0} tools</span>
+            ${timeStr ? `<span class="subagent-time">${timeStr}</span>` : ''}
+          </div>
+        </div>
+        ${metaHtml}
+        ${promptHtml}
+        ${branchPromptHtml}
+        ${summaryHtml}
+        ${filesHtml}
+        ${transcriptHtml}
+        ${gateSectionHtml}
+        ${feedbackHtml}
+      </div>`;
+    }
+
+    function renderInvocations(invocations, promptFiles) {
+      if (!invocations.length) return '';
+      const groups = groupInvocations(invocations);
+      const totalAttempts = invocations.length;
+      const label = `Invocations (${groups.length} subagent${groups.length !== 1 ? 's' : ''}, ${totalAttempts} total)`;
+      const pf = promptFiles || [];
+
+      const html = groups.map((g, gi) => {
+        const inv = g.primary;
+        const retries = g.retries;
+        const hasRetries = retries.length > 0;
+        const lastInv = hasRetries ? retries[retries.length - 1] : inv;
+        const finalPassed = lastInv.gate ? lastInv.gate.passed : true;
+        const allInvocations = [inv, ...retries];
+
+        // Compute overall start/end
+        let startTimeStr = '';
+        let endTimeStr = '';
+        if (inv.completed_at && inv.duration_ms) {
+          const endMs = new Date(inv.completed_at).getTime();
+          const startMs = endMs - inv.duration_ms;
+          startTimeStr = fmtTime(new Date(startMs).toISOString());
+          endTimeStr = fmtTime(inv.completed_at);
+        } else if (inv.completed_at) {
+          endTimeStr = fmtTime(inv.completed_at);
+        }
+        if (hasRetries && lastInv.completed_at) {
+          endTimeStr = fmtTime(lastInv.completed_at);
+        }
+        const timeRange = startTimeStr
+          ? `<span class="subagent-time">${startTimeStr}${endTimeStr ? ' → ' + endTimeStr : ''}</span>`
+          : '';
+
+        // Aggregate stats
+        const totalMsgs = Math.max(inv.message_count || 0, ...(retries.map(r => r.message_count || 0)));
+        const totalTools = (inv.tool_call_count || 0) + retries.reduce((s, r) => s + (r.tool_call_count || 0), 0);
+
+        const gateIcon = finalPassed
+          ? `<span class="gate-pass">&#10003;</span>`
+          : `<span class="gate-fail">&#10007;</span>`;
+
+        const taskHint = extractTaskHint(inv);
+
+        // Render all attempts as separate blocks
+        const attemptBlocks = allInvocations.map((a, ai) => {
+          const isLast = ai === allInvocations.length - 1;
+          if (ai === 0) {
+            return renderAttemptBlock(a, `Attempt 1`, 'attempt-label-primary', isLast, gi, ai, pf);
+          } else {
+            return renderAttemptBlock(a, `↻ Retry ${ai}`, 'attempt-label-retry', isLast, gi, ai, pf);
+          }
+        }).join('');
+
+        return `<div class="subagent-group" onclick="this.classList.toggle('open');event.stopPropagation()">
+          <div class="subagent-header">
+            <span class="subagent-toggle">&#9654;</span>
+            <span class="subagent-label">Subagent ${gi + 1}</span>
+            ${inv.model ? `<span class="step-model">${esc(inv.model)}</span>` : ''}
+            ${taskHint ? `<span style="font-size:11px;color:var(--text-secondary);font-style:italic">${esc(taskHint)}</span>` : ''}
+            ${timeRange}
+            ${inv.hook_status && inv.hook_status !== 'unknown' ? `<span class="pill pill-${inv.hook_status === 'completed' ? 'completed' : 'failed'}">${esc(inv.hook_status)}</span>` : ''}
+            <span>${fmtDuration(inv.duration_ms)}</span>
+            <span>${totalMsgs} msg</span>
+            <span>${totalTools} tools</span>
+            ${gateIcon}
+            ${hasRetries ? `<span class="gate-info">${retries.length} retr${retries.length === 1 ? 'y' : 'ies'}</span>` : ''}
+          </div>
+          <div class="subagent-body" onclick="event.stopPropagation()">
+            ${attemptBlocks}
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="detail-block"><div class="detail-label">${label}</div>${html}</div>`;
+    }
+
+    function renderToolWarnings(st) {
+      const warnings = st.tool_warnings;
+      if (!warnings || !warnings.length) return '';
+
+      const rows = warnings.map(w => {
+        const typeBadge = `<span class="tool-warning-type">${esc(w.type || '?')}</span>`;
+        return `<div class="tool-warning-row">
+          <span class="tool-warning-icon">&#9888;</span>
+          <div class="tool-warning-text">
+            <span class="tool-warning-tool">${esc(w.tool)}</span> ${typeBadge}
+            <div style="font-size:11px;margin-top:2px">${esc(w.warning)}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      return `<div class="detail-block">
+        <div class="tool-warning-box">
+          <div style="font-size:11px;font-weight:600;margin-bottom:4px">&#9888; Tool Warnings (${warnings.length})</div>
+          ${rows}
+        </div>
+      </div>`;
+    }
+
+    function renderPromptFiles(st) {
+      const files = st.prompt_files;
+      if (!files || !files.length) return '';
+      // Support both old format (plain strings) and new format (objects with content)
+      const rows = files.map((f, i) => {
+        const isObj = typeof f === 'object' && f !== null;
+        const path = isObj ? f.path : f;
+        const content = isObj ? f.content : null;
+        const idx = isObj && f.branch_index != null ? f.branch_index : i;
+        const id = `prompt-${st.name}-${idx}`;
+        const contentBlock = content
+          ? `<div id="${id}" class="prompt-content" style="display:none;margin:4px 0 8px 0;max-height:400px;overflow:auto;background:var(--bg-secondary);border:1px solid var(--border-light);border-radius:4px;padding:8px;font-size:11px;white-space:pre-wrap;font-family:var(--mono)">${esc(content)}</div>`
+          : '';
+        const toggleBtn = content
+          ? `<span class="prompt-toggle" onclick="var el=document.getElementById('${id}');el.style.display=el.style.display==='none'?'block':'none';this.textContent=el.style.display==='none'?'▶':'▼'" style="cursor:pointer;font-size:10px;margin-right:4px;color:var(--text-muted)">▶</span>`
+          : '<span style="font-size:10px;margin-right:4px;color:var(--text-muted)">·</span>';
+        return `<li style="margin:2px 0">
+          ${toggleBtn}<strong style="font-size:11px">Branch ${idx}</strong>
+          <code style="font-size:10px;background:var(--bg-secondary);padding:1px 4px;border-radius:3px;margin-left:4px">${esc(path)}</code>
+          ${contentBlock}
+        </li>`;
+      }).join('');
+      return `<div class="detail-block">
+        <div class="detail-label">Branch Prompts (${files.length} files)</div>
+        <ul style="list-style:none;padding:0;margin:4px 0">${rows}</ul>
+      </div>`;
+    }
+
+    function renderStepToolCalls(st, stepIdx) {
+      if (!trace.tool_calls || !trace.tool_calls.length) return '';
+      const calls = trace.tool_calls.map((tc, gi) => ({ ...tc, _gi: gi })).filter(tc => tc.step === st.name);
+      if (!calls.length) return '';
+
+      const rows = calls.map(tc => {
+        const ok = tc.success !== false;
+        const dotCls = ok ? 'orch-dot orch-dot-green' : 'orch-dot orch-dot-fail';
+        const toolName = tc.tool_short || tc.tool || '?';
+        const sourceLabel = tc.source === 'tool_server' ? 'script' : (tc.source === 'mcp_transcript' ? 'mcp' : (tc.source || ''));
+        const sourceCls = tc.source === 'tool_server' ? 'tool-call-source-script' : 'tool-call-source-mcp';
+        const argsStr = tc.arguments && Object.keys(tc.arguments).length
+          ? Object.entries(tc.arguments).map(([k, v]) => k + '=' + v).join(', ')
+          : '';
+        const dur = tc.duration_ms != null ? `<span class="orch-dur">${tc.duration_ms}ms</span>` : '';
+        const errHtml = tc.error ? `<span class="orch-error">${esc(tc.error)}</span>` : '';
+        const exitHtml = tc.exit_code != null && tc.exit_code !== 0 ? `<span class="orch-error">exit ${tc.exit_code}</span>` : '';
+        const outLen = tc.output_length ? `<span class="orch-summary" title="output size">${tc.output_length} chars output</span>` : '';
+        const time = tc.timestamp ? `<span class="orch-time">${fmtTime(tc.timestamp)}</span>` : '';
+
+        let previewHtml = '';
+        if (tc.output_preview) {
+          const truncated = tc.output_preview.length > 100 ? tc.output_preview.substring(0, 100) + '...' : tc.output_preview;
+          previewHtml = `<div class="tool-call-preview" onclick="this.classList.toggle('expanded');event.stopPropagation()" title="Click to expand">${esc(truncated)}</div>`;
+        }
+
+        return `<div class="tool-call-row" id="tc-detail-${tc._gi}">
+          ${time}
+          <span class="${dotCls}"></span>
+          <span class="tool-call-name">${esc(toolName)}</span>
+          ${sourceLabel ? `<span class="tool-call-source ${sourceCls}">${sourceLabel}</span>` : ''}
+          ${argsStr ? `<span class="tool-call-args">${esc(argsStr)}</span>` : ''}
+          ${dur}
+          ${outLen}
+          ${exitHtml}${errHtml}
+        </div>${previewHtml}`;
+      }).join('');
+
+      return `<div class="detail-block">
+        <div class="tool-calls-section">
+          <div class="tool-calls-section-title">Tool Calls (${calls.length})</div>
+          ${rows}
+        </div>
+      </div>`;
+    }
+
+    function renderModifiedFiles(files) {
+      if (!files.length) return '';
+      return `<div class="detail-block">
+        <details>
+          <summary>${files.length} file${files.length !== 1 ? 's' : ''} modified across all attempts</summary>
+          <ul class="file-list">${files.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+        </details>
+      </div>`;
+    }
+
+    function renderStepIO(inputs, outputs) {
+      if (!inputs && !outputs) return '';
+      let html = '';
+      if (inputs && inputs.length) {
+        const items = inputs.map(inp => {
+          const tags = [];
+          if (inp.inject) tags.push(`<span class="io-tag">${esc(inp.inject)}</span>`);
+          if (inp.struct) tags.push(`<span class="io-tag">struct: ${esc(inp.struct)}</span>`);
+          return `<li><span class="io-path">${esc(inp.path || '?')}</span> ${tags.join(' ')}</li>`;
+        }).join('');
+        html += `<div class="io-group"><div class="io-group-label">Inputs</div><ul class="io-list">${items}</ul></div>`;
+      }
+      if (outputs && outputs.length) {
+        const items = outputs.map(out => {
+          const tags = [];
+          if (out.struct) tags.push(`<span class="io-tag">struct: ${esc(out.struct)}</span>`);
+          return `<li><span class="io-path">${esc(out.path || '?')}</span> ${tags.join(' ')}</li>`;
+        }).join('');
+        html += `<div class="io-group"><div class="io-group-label">Outputs</div><ul class="io-list">${items}</ul></div>`;
+      }
+      return `<div class="detail-block"><div class="detail-label">Inputs / Outputs</div>${html}</div>`;
+    }
+
+    function toggleStep(idx) { document.getElementById('step-' + idx).classList.toggle('open'); }
+
+    function scrollToStep(idx) {
+      const el = document.getElementById('step-' + idx);
+      if (el) { el.classList.add('open'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    }
+
+    function scrollToSubagent(stepIdx, groupIdx, attemptIdx) {
+      // Open the target step card and find the nth subagent-group within it
+      const stepCard = document.getElementById('step-' + stepIdx);
+      if (!stepCard) return;
+      stepCard.classList.add('open');
+      const groups = stepCard.querySelectorAll('.subagent-group');
+      if (groups[groupIdx]) {
+        groups[groupIdx].classList.add('open');
+        // If attemptIdx given, scroll to the specific attempt block
+        const target = typeof attemptIdx === 'number'
+          ? groups[groupIdx].querySelector(`.attempt-block[data-attempt="${attemptIdx}"]`)
+          : groups[groupIdx];
+        const el = target || groups[groupIdx];
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Brief highlight
+        el.style.outline = '2px solid var(--accent)';
+        el.style.outlineOffset = '2px';
+        setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1800);
+      }
+    }
+
+    // ── Tooltip system (click to show, ? hint follows cursor) ──
+    (function() {
+      let activeTip = null;
+      let hint = null;
+
+      // Create floating ? hint
+      function ensureHint() {
+        if (hint) return;
+        hint = document.createElement('div');
+        hint.className = 'tip-hint';
+        hint.textContent = '?';
+        hint.style.opacity = '0';
+        document.body.appendChild(hint);
+      }
+
+      function closeTip() {
+        if (activeTip) { activeTip.remove(); activeTip = null; }
+      }
+
+      // Show/hide ? near cursor when hovering data-tip elements
+      document.addEventListener('mouseover', function(e) {
+        const el = e.target.closest('[data-tip]');
+        ensureHint();
+        hint.style.opacity = el ? '1' : '0';
+      });
+      document.addEventListener('mouseout', function(e) {
+        if (!e.target.closest('[data-tip]')) {
+          ensureHint();
+          hint.style.opacity = '0';
+        }
+      });
+      document.addEventListener('mousemove', function(e) {
+        if (!hint || hint.style.opacity === '0') return;
+        hint.style.left = (e.clientX + 12) + 'px';
+        hint.style.top = (e.clientY - 8) + 'px';
+      });
+
+      // Click to show tooltip popup
+      document.addEventListener('click', function(e) {
+        const el = e.target.closest('[data-tip]');
+        if (!el) { closeTip(); return; }
+        e.stopPropagation();
+        if (activeTip && activeTip._src === el) { closeTip(); return; }
+        closeTip();
+        const rect = el.getBoundingClientRect();
+        const tip = document.createElement('div');
+        tip.className = 'tip-popup';
+        tip.textContent = el.dataset.tip;
+        tip._src = el;
+        document.body.appendChild(tip);
+        const tipRect = tip.getBoundingClientRect();
+        let left = rect.left + rect.width / 2 - tipRect.width / 2;
+        let top = rect.top - tipRect.height - 8;
+        if (left < 8) left = 8;
+        if (left + tipRect.width > window.innerWidth - 8) left = window.innerWidth - tipRect.width - 8;
+        if (top < 8) { top = rect.bottom + 8; }
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+        activeTip = tip;
+      }, true);
+      document.addEventListener('scroll', closeTip, true);
+    })();
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = String(s);
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

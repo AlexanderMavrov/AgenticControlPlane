@@ -1,0 +1,48 @@
+name: context-summary
+version: 2
+description: >
+  Validates the load-context step output. Summarizes the pipeline data,
+  memory state, and narrative freshness for downstream steps.
+type: object
+
+required:
+  - pipeline_generated_at
+  - cot_extreme_count
+  - markets_with_failures
+  - memory_exists
+  - narrative_files
+
+properties:
+  pipeline_generated_at:
+    type: string
+    description: "ISO timestamp copied from shapiro_report.json"
+  cot_extreme_count:
+    type: integer
+    description: "Count of markets with cot_percentile >= 80 or <= 20"
+  markets_with_failures:
+    type: array
+    description: "Symbols that have at least one news failure"
+    items:
+      type: string
+  memory_exists:
+    type: boolean
+  memory_highlights:
+    type: string
+    description: "Brief summary from previous memory file, or null if no memory"
+  narrative_files:
+    type: array
+    items:
+      type: object
+      required: [symbol, last_updated, days_since_update]
+      properties:
+        symbol:
+          type: string
+        last_updated:
+          type: string
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+        days_since_update:
+          type: integer
+
+file_checks:
+  exists: true
+  min_size: 50

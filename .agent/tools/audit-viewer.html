@@ -1,0 +1,350 @@
+<!--
+  Audit Viewer — Browser-based viewer for spec-audit workflow reports.
+
+  This tool is designed for the "spec-audit" predefined workflow
+  (.agent/workflows/templates/predefined/spec-audit/).
+
+  Expected input files (drag-drop or file picker):
+    - audit-report.json   — produced by the REPORT step of spec-audit workflow
+                             (output path: data/{run_id}-audit-report.json)
+                             Schema: spec-audit/structs/audit-report.schema.yaml
+    - verified-results.json — optional post-verification file with reclassified
+                               findings (false positives, inconclusives marked)
+
+  Canonical location: .agent/tools/audit-viewer.html
+  No dependencies — pure HTML/CSS/JS, works offline in any browser.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spec Audit Report</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --card: #fff; --border: #e2e6ea; --text: #1a1d21;
+    --muted: #6b7280; --accent: #3b82f6; --red: #dc2626; --red-bg: #fef2f2;
+    --amber: #d97706; --amber-bg: #fffbeb; --green: #16a34a; --green-bg: #f0fdf4;
+    --blue: #2563eb; --blue-bg: #eff6ff; --purple: #7c3aed; --purple-bg: #f5f3ff;
+    --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:var(--font); background:var(--bg); color:var(--text); font-size:13px; line-height:1.6; padding:24px; }
+  .container { max-width:900px; margin:0 auto; }
+  .drop-zone { border:2px dashed var(--border); border-radius:12px; padding:48px 24px; text-align:center;
+    color:var(--muted); cursor:pointer; transition:border-color .2s, background .2s; margin-bottom:24px; }
+  .drop-zone:hover, .drop-zone.over { border-color:var(--accent); background:var(--blue-bg); }
+  .drop-zone input { display:none; }
+  h1 { font-size:20px; font-weight:700; margin-bottom:4px; }
+  .subtitle { color:var(--muted); font-size:12px; margin-bottom:24px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:10px; margin-bottom:24px; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+  .stat-val { font-size:22px; font-weight:700; }
+  .stat-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .stat-green .stat-val { color:var(--green); }
+  .stat-red .stat-val { color:var(--red); }
+  .stat-amber .stat-val { color:var(--amber); }
+  .stat-blue .stat-val { color:var(--blue); }
+  .stat-purple .stat-val { color:var(--purple); }
+  .section { background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:16px; overflow:hidden; }
+  .section-hdr { padding:12px 16px; font-weight:700; font-size:13px; cursor:pointer; display:flex; justify-content:space-between;
+    align-items:center; user-select:none; }
+  .section-hdr:hover { background:var(--bg); }
+  .section-hdr .arrow { transition:transform .2s; font-size:10px; color:var(--muted); }
+  .section-hdr.open .arrow { transform:rotate(90deg); }
+  .section-body { display:none; border-top:1px solid var(--border); }
+  .section-hdr.open + .section-body { display:block; }
+  .finding { padding:14px 16px; border-bottom:1px solid var(--border); }
+  .finding:last-child { border-bottom:none; }
+  .finding-hdr { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+  .badge { padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  .badge-must { background:var(--red-bg); color:var(--red); }
+  .badge-should { background:var(--amber-bg); color:var(--amber); }
+  .badge-may { background:var(--blue-bg); color:var(--blue); }
+  .badge-critical { background:#1a1d21; color:#fff; }
+  .badge-moderate { background:var(--amber-bg); color:var(--amber); }
+  .badge-minor { background:var(--bg); color:var(--muted); }
+  .badge-confirmed { background:var(--red-bg); color:var(--red); }
+  .badge-fp { background:var(--green-bg); color:var(--green); }
+  .badge-inconclusive { background:var(--purple-bg); color:var(--purple); }
+  .spec-id { font-weight:700; font-family:var(--mono); font-size:12px; }
+  .requirement { color:var(--text); font-size:12px; }
+  .file-ref { font-family:var(--mono); font-size:11px; color:var(--accent); margin-top:4px; }
+  .snippet { background:#1e1e2e; color:#cdd6f4; padding:10px 12px; border-radius:6px; font-family:var(--mono);
+    font-size:11px; line-height:1.5; margin:8px 0; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
+  .explanation { font-size:12px; color:var(--muted); margin:6px 0; }
+  .fix { background:var(--green-bg); border:1px solid #bbf7d0; border-radius:6px; padding:8px 12px; font-size:12px; margin-top:8px; }
+  .fix-label { font-weight:700; color:var(--green); font-size:10px; text-transform:uppercase; margin-bottom:2px; }
+  .domain-bar { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); }
+  .domain-bar:last-child { border-bottom:none; }
+  .domain-name { font-weight:600; min-width:140px; }
+  .bar-track { flex:1; height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:4px; transition:width .3s; }
+  .bar-green { background:var(--green); }
+  .bar-red { background:var(--red); }
+  .bar-amber { background:var(--amber); }
+  .domain-stat { font-size:11px; color:var(--muted); min-width:100px; text-align:right; }
+  .reco { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; gap:10px; }
+  .reco:last-child { border-bottom:none; }
+  .reco-num { font-weight:700; color:var(--accent); min-width:24px; }
+  .fp-section .finding { background:var(--green-bg); }
+  .inc-section .finding { background:var(--purple-bg); }
+  .hidden { display:none; }
+  .verified-note { background:var(--blue-bg); border:1px solid #bfdbfe; border-radius:6px; padding:8px 12px; font-size:12px; margin-bottom:16px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".json" onchange="loadFile(this.files[0])">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Drop audit-report.json or verified-results.json</div>
+    <div style="font-size:11px">or click to browse</div>
+  </div>
+  <div id="report" class="hidden"></div>
+</div>
+<script>
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+function loadFile(f) {
+  const r = new FileReader();
+  r.onload = e => { try { render(JSON.parse(e.target.result), f.name); } catch(err) { alert('Invalid JSON: '+err.message); } };
+  r.readAsText(f);
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
+function num(v) { return v != null ? v : '—'; }
+
+function severityBadge(s) {
+  if (!s) return '';
+  const c = s === 'MUST' ? 'must' : s === 'SHOULD' ? 'should' : 'may';
+  return `<span class="badge badge-${c}">${esc(s)}</span>`;
+}
+function impactBadge(i) {
+  if (!i) return '';
+  const c = i === 'critical' ? 'critical' : i === 'moderate' ? 'moderate' : 'minor';
+  return `<span class="badge badge-${c}">${esc(i)}</span>`;
+}
+function statusBadge(s) {
+  if (s === 'false_positive') return `<span class="badge badge-fp">false positive</span>`;
+  if (s === 'inconclusive') return `<span class="badge badge-inconclusive">inconclusive</span>`;
+  if (s === 'confirmed') return `<span class="badge badge-confirmed">confirmed</span>`;
+  return '';
+}
+
+// Derive domain from spec_id prefix: ERRC-001 → error-conditions
+const DOMAIN_MAP = {
+  'ERRC':'error-conditions', 'EXCD':'exit-codes', 'FLOW':'flow-control',
+  'FDET':'force-detach', 'NVRM':'nvram', 'POWC':'power-cycle', 'RECV':'recovery'
+};
+function domainOf(specId) {
+  if (!specId) return 'unknown';
+  const prefix = specId.replace(/-\d+$/, '');
+  return DOMAIN_MAP[prefix] || prefix.toLowerCase();
+}
+
+function renderFinding(v) {
+  let h = `<div class="finding">
+    <div class="finding-hdr">
+      <span class="spec-id">${esc(v.spec_id)}</span>
+      ${severityBadge(v.severity)}
+      ${impactBadge(v.impact)}
+      ${statusBadge(v.verified_status)}
+    </div>
+    <div class="requirement">${esc(v.requirement)}</div>`;
+  if (v.file_path) h += `<div class="file-ref">${esc(v.file_path)}${v.line_number ? ':'+v.line_number : ''}</div>`;
+  if (v.code_snippet) h += `<div class="snippet">${esc(v.code_snippet)}</div>`;
+  const expl = v.explanation || v.scan_explanation || '';
+  if (expl) h += `<div class="explanation">${esc(expl)}</div>`;
+  if (v.verification_note) h += `<div class="explanation"><strong>Verification:</strong> ${esc(v.verification_note)}</div>`;
+  if (v.suggested_fix) h += `<div class="fix"><div class="fix-label">Suggested Fix</div>${esc(v.suggested_fix)}</div>`;
+  h += '</div>';
+  return h;
+}
+
+function render(d, fileName) {
+  document.getElementById('dropZone').classList.add('hidden');
+  const el = document.getElementById('report');
+  el.classList.remove('hidden');
+
+  // Detect file type: audit-report vs verified-results
+  const isVerified = !!d.reclassification_summary;
+  const isReport = !!d.compliance;
+
+  const c = d.compliance || {};
+  const sb = d.severity_breakdown || {};
+  const ds = d.domain_summaries || [];
+  const recs = d.recommendations || [];
+  const tops = d.top_issues_verified || d.top_issues || [];
+  const header = d.header_note || '';
+  const runId = d.run_id || '';
+  const date = d.report_generated_at || d.verified_at || '';
+  const vsum = d.verification_summary || d.reclassification_summary || {};
+  // target_scope = the spec scope audited (e.g., "astro"); disambiguated
+  // from the existing audit-report `scope` object which describes breadth.
+  const targetScope = d.target_scope || (d.params && d.params.scope) || '';
+  const scopesAudited = Array.isArray(d.scopes_audited) ? d.scopes_audited : [];
+
+  // Collect all findings
+  let violations = [], partials = [], falsePositives = [], inconclusives = [];
+
+  if (isVerified) {
+    // verified-results.json: all findings in d.findings[]
+    (d.findings || []).forEach(f => {
+      if (f.verified_status === 'false_positive') falsePositives.push(f);
+      else if (f.verified_status === 'inconclusive') inconclusives.push(f);
+      else if (f.original_status === 'partial') partials.push(f);
+      else violations.push(f);
+    });
+  } else {
+    // audit-report.json: violations in d.violations[], partials/fps may be separate or absent
+    violations = d.violations || [];
+    partials = d.partials_confirmed || d.partials || [];
+    falsePositives = d.false_positives || [];
+  }
+
+  // Group violations by domain
+  const byDomain = {};
+  violations.forEach(v => {
+    const dom = v.domain || domainOf(v.spec_id);
+    (byDomain[dom] = byDomain[dom] || []).push(v);
+  });
+
+  // Normalize compliance_rate — could be 0-1 decimal or 0-100 percentage
+  let compRate = c.compliance_rate;
+  if (typeof compRate === 'number' && compRate > 0 && compRate <= 1) compRate = compRate * 100;
+
+  let h = '';
+  h += `<h1>Spec Audit Report</h1>`;
+  let scopeBadge = '';
+  if (targetScope) {
+    const list = scopesAudited.length ? scopesAudited.join(', ') : targetScope;
+    scopeBadge = ` &mdash; scope: <b>${esc(targetScope)}</b>` +
+      (scopesAudited.length > 1 ? ` <span style="color:var(--muted)">(${esc(list)})</span>` : '');
+  }
+  h += `<div class="subtitle">${esc(runId)} &mdash; ${esc(date)} &mdash; ${esc(fileName)}${scopeBadge}</div>`;
+  if (header) h += `<div class="verified-note">${esc(header)}</div>`;
+
+  // Stats
+  h += `<div class="stats">`;
+  if (isReport) {
+    h += `<div class="stat stat-green"><div class="stat-val">${num(c.compliant)}</div><div class="stat-label">Compliant</div></div>`;
+    h += `<div class="stat stat-red"><div class="stat-val">${num(c.violation)}</div><div class="stat-label">Violations</div></div>`;
+    h += `<div class="stat stat-amber"><div class="stat-val">${num(c.partial)}</div><div class="stat-label">Partial</div></div>`;
+    h += `<div class="stat stat-purple"><div class="stat-val">${num(c.unverifiable)}</div><div class="stat-label">Unverifiable</div></div>`;
+    h += `<div class="stat stat-blue"><div class="stat-val">${typeof compRate==='number' ? compRate.toFixed(1)+'%' : '—'}</div><div class="stat-label">Compliance</div></div>`;
+    if (c.inconclusive != null) h += `<div class="stat"><div class="stat-val">${c.inconclusive}</div><div class="stat-label">Inconclusive</div></div>`;
+  }
+  if (vsum.confirmed != null || vsum.false_positive != null) {
+    h += `<div class="stat stat-red"><div class="stat-val">${num(vsum.confirmed)}</div><div class="stat-label">Confirmed</div></div>`;
+    h += `<div class="stat stat-green"><div class="stat-val">${num(vsum.false_positive)}</div><div class="stat-label">False Positives</div></div>`;
+    h += `<div class="stat"><div class="stat-val">${num(vsum.inconclusive)}</div><div class="stat-label">Inconclusive</div></div>`;
+  }
+  h += `</div>`;
+
+  // Severity breakdown
+  if (sb.must || sb.should || sb.may) {
+    h += `<div class="section"><div class="section-hdr open" onclick="toggleSection(this)">Severity Breakdown <span class="arrow">&#9654;</span></div><div class="section-body">`;
+    ['must','should','may'].forEach(s => {
+      if (!sb[s]) return;
+      const pct = sb[s].total ? ((sb[s].total - sb[s].violations) / sb[s].total * 100).toFixed(0) : 100;
+      h += `<div class="domain-bar">
+        <div class="domain-name">${s.toUpperCase()}</div>
+        <div class="bar-track"><div class="bar-fill bar-green" style="width:${pct}%"></div></div>
+        <div class="domain-stat">${sb[s].violations} / ${sb[s].total} violations</div>
+      </div>`;
+    });
+    h += `</div></div>`;
+  }
+
+  // Domain summaries
+  if (ds.length) {
+    h += `<div class="section"><div class="section-hdr open" onclick="toggleSection(this)">Domains <span class="arrow">&#9654;</span></div><div class="section-body">`;
+    ds.sort((a,b) => (b.violations_count||0) - (a.violations_count||0));
+    ds.forEach(d => {
+      // compliance_rate could be 0-1 or 0-100
+      let rate = d.compliance_rate;
+      if (typeof rate === 'number' && rate > 0 && rate <= 1) rate = rate * 100;
+      rate = typeof rate === 'number' ? rate.toFixed(0) : '?';
+      const vc = d.violations_count || 0;
+      const cls = vc === 0 ? 'green' : vc > 3 ? 'red' : 'amber';
+      h += `<div class="domain-bar">
+        <div class="domain-name">${esc(d.domain)}</div>
+        <div class="bar-track"><div class="bar-fill bar-${cls}" style="width:${rate}%"></div></div>
+        <div class="domain-stat">${vc} violations &middot; ${rate}%</div>
+      </div>`;
+    });
+    h += `</div></div>`;
+  }
+
+  // Top issues
+  if (tops.length) {
+    h += `<div class="section"><div class="section-hdr open" onclick="toggleSection(this)">Top Issues <span class="arrow">&#9654;</span></div><div class="section-body">`;
+    tops.forEach(t => {
+      h += `<div class="reco"><div class="reco-num">#${t.rank||''}</div><div><strong>${esc(t.theme||'')}</strong>
+        <span style="color:var(--muted);font-size:11px;margin-left:6px">${esc((t.specs||[]).join(', '))}</span>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(t.summary||'')}</div></div></div>`;
+    });
+    h += `</div></div>`;
+  }
+
+  // Violations by domain
+  const domains = Object.keys(byDomain).sort();
+  if (domains.length) {
+    domains.forEach(dom => {
+      const items = byDomain[dom];
+      h += `<div class="section"><div class="section-hdr" onclick="toggleSection(this)">
+        <span>${esc(dom)} <span style="color:var(--red);font-weight:400">(${items.length} violations)</span></span>
+        <span class="arrow">&#9654;</span></div><div class="section-body">`;
+      items.forEach(v => { h += renderFinding(v); });
+      h += `</div></div>`;
+    });
+  }
+
+  // Partials
+  if (partials.length) {
+    h += `<div class="section"><div class="section-hdr" onclick="toggleSection(this)">
+      <span>Partial Compliance <span style="color:var(--amber);font-weight:400">(${partials.length})</span></span>
+      <span class="arrow">&#9654;</span></div><div class="section-body">`;
+    partials.forEach(v => { h += renderFinding(v); });
+    h += `</div></div>`;
+  }
+
+  // False positives
+  if (falsePositives.length) {
+    h += `<div class="section fp-section"><div class="section-hdr" onclick="toggleSection(this)">
+      <span>False Positives <span style="color:var(--green);font-weight:400">(${falsePositives.length})</span></span>
+      <span class="arrow">&#9654;</span></div><div class="section-body">`;
+    falsePositives.forEach(v => { h += renderFinding(v); });
+    h += `</div></div>`;
+  }
+
+  // Inconclusives
+  if (inconclusives.length) {
+    h += `<div class="section inc-section"><div class="section-hdr" onclick="toggleSection(this)">
+      <span>Inconclusive <span style="color:var(--purple);font-weight:400">(${inconclusives.length})</span></span>
+      <span class="arrow">&#9654;</span></div><div class="section-body">`;
+    inconclusives.forEach(v => { h += renderFinding(v); });
+    h += `</div></div>`;
+  }
+
+  // Recommendations
+  if (recs.length) {
+    h += `<div class="section"><div class="section-hdr" onclick="toggleSection(this)">
+      <span>Recommendations</span><span class="arrow">&#9654;</span></div><div class="section-body">`;
+    recs.forEach(r => {
+      h += `<div class="reco"><div class="reco-num">P${r.priority||''}</div><div style="font-size:12px">${esc(r.description)}</div></div>`;
+    });
+    h += `</div></div>`;
+  }
+
+  el.innerHTML = h;
+}
+
+function toggleSection(el) { el.classList.toggle('open'); }
+</script>
+</body>
+</html>

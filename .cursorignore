@@ -1,0 +1,6 @@
+
+# Agentic Control Plane — visibility overrides
+# Make workflow engine files visible to Cursor despite .gitignore
+!.agent/
+!.cursor/
+!.mcp.json

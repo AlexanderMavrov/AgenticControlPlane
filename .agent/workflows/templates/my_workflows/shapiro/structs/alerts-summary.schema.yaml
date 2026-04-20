@@ -1,0 +1,57 @@
+name: alerts-summary
+version: 1
+description: >
+  Validates the send-alerts step output. Records what was sent, any
+  delivery errors, and whether it was a dry run.
+type: object
+
+required:
+  - sent_at
+  - dry_run
+  - alerts_sent
+  - alerts
+  - delivery_errors
+
+properties:
+  sent_at:
+    type: string
+  dry_run:
+    type: boolean
+  alerts_sent:
+    type: integer
+  alerts:
+    type: array
+    items:
+      type: object
+      required: [symbol, bias, score, priority]
+      properties:
+        symbol:
+          type: string
+        bias:
+          type: string
+          enum: [BULLISH, BEARISH]
+        score:
+          type: number
+        priority:
+          type: integer
+        pushover_status:
+          type: string
+        email_status:
+          type: string
+  delivery_errors:
+    type: array
+    items:
+      type: object
+      required: [symbol, channel, error]
+      properties:
+        symbol:
+          type: string
+        channel:
+          type: string
+          enum: [pushover, email]
+        error:
+          type: string
+
+file_checks:
+  exists: true
+  min_size: 20

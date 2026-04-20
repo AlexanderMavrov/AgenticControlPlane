@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This project has two layers:
 
-1. **Agentic Control Plane** — a declarative workflow engine for LLM-driven development tasks, deployed from `tasks/fundamental_analyzer/dist/`. The engine defines multi-step workflows (YAML), executes them via subagents with structural/semantic/human gates, tracks state in manifests, and records execution traces.
+1. **Agentic Control Plane** — a declarative workflow engine for LLM-driven development tasks, deployed from the root `C:/Projects/AgenticControlPlane/` via `install.py`. The engine defines multi-step workflows (YAML), executes them via subagents with structural/semantic/human gates, tracks state in manifests, and records execution traces.
 
 2. **Argus** (target project) — an Elliott Wave analysis platform for financial markets (Python). Accessed via symlink `elliott_wave_source` → `C:/Users/aleksandar.mavrov/Projects/ElliotWaveAnalyzer`. The workflow engine is meant to be deployed into this project to manage specs, code changes, and audits.
 
@@ -19,7 +19,7 @@ projects/trading/
 ├── CLAUDE.md                          # This file
 ├── elliott_wave_source -> ...         # Symlink to Argus source code
 └── tasks/
-    └── fundamental_analyzer/
+    └── shapiro/
         └── dist/                      # Workflow engine distribution (development copy)
             ├── .agent/                # Universal engine layer
             │   ├── docs/              # Engine documentation (format references)

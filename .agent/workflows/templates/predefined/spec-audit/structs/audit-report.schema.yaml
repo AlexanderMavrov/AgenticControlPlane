@@ -1,0 +1,80 @@
+name: audit-report
+description: >
+  Final consolidated audit report — all domain scan results merged into
+  a single structured document. Grouped by severity, then by impact.
+  Includes compliance statistics, actionable recommendations, and
+  optional fix suggestions.
+format: json
+
+json_schema:
+  required_fields:
+    - field: workflow
+      type: string
+    - field: report_generated_at
+      type: string
+    - field: target_scope
+      type: string
+    - field: scope
+      type: object
+    - field: scope.total_specs
+      type: number
+    - field: scope.total_domains
+      type: number
+    - field: scope.total_requirements
+      type: number
+    - field: scope.total_files
+      type: number
+    - field: scope.filters_applied
+      type: object
+    - field: compliance
+      type: object
+    - field: compliance.compliant
+      type: number
+    - field: compliance.violation
+      type: number
+    - field: compliance.partial
+      type: number
+    - field: compliance.unverifiable
+      type: number
+    - field: compliance.compliance_rate
+      type: number
+    - field: severity_breakdown
+      type: object
+    - field: severity_breakdown.must
+      type: object
+    - field: severity_breakdown.must.total
+      type: number
+    - field: severity_breakdown.must.violations
+      type: number
+    - field: severity_breakdown.should
+      type: object
+    - field: severity_breakdown.should.total
+      type: number
+    - field: severity_breakdown.should.violations
+      type: number
+    - field: severity_breakdown.may
+      type: object
+    - field: severity_breakdown.may.total
+      type: number
+    - field: severity_breakdown.may.violations
+      type: number
+    - field: violations
+      type: array
+    - field: domain_summaries
+      type: array
+    - field: domain_summaries[].domain
+      type: string
+    - field: domain_summaries[].compliance_rate
+      type: number
+    - field: domain_summaries[].violations_count
+      type: number
+    - field: recommendations
+      type: array
+    - field: recommendations[].priority
+      type: number
+    - field: recommendations[].description
+      type: string
+
+file_checks:
+  exists: true
+  min_size: 200

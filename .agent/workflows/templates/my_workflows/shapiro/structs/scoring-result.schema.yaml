@@ -1,0 +1,78 @@
+name: scoring-result
+version: 3
+description: >
+  Validates the Shapiro scoring output. Contains per-market scores with
+  COT, news failure, and narrative components, confidence levels, and bias.
+  Includes both (a) markets with total_score >= 50 and (b) EXTREME COT
+  markets (percentile >= 90 or <= 10) regardless of score, distinguished
+  by the include_reason field.
+type: object
+
+required:
+  - scored_at
+  - markets_analyzed
+  - markets_qualifying
+  - results
+
+properties:
+  scored_at:
+    type: string
+  markets_analyzed:
+    type: integer
+  markets_qualifying:
+    type: integer
+  markets_extreme_cot:
+    type: integer
+  results:
+    type: array
+    items:
+      type: object
+      required:
+        - symbol
+        - total_score
+        - confidence
+        - bias
+        - include_reason
+        - cot_score
+        - cot_percentile
+        - cot_crowding
+        - news_failure_score
+        - news_failure_detail
+        - narrative_score
+        - narrative_detail
+        - contrarian_thesis
+      properties:
+        symbol:
+          type: string
+        total_score:
+          type: number
+        confidence:
+          type: string
+          enum: [CONVICTION, HIGH, MEDIUM, LOW]
+        bias:
+          type: string
+          enum: [BULLISH, BEARISH]
+        include_reason:
+          type: string
+          enum: [scored, extreme_cot]
+        cot_score:
+          type: number
+        cot_percentile:
+          type: number
+        cot_crowding:
+          type: string
+          enum: [LONG, SHORT, NEUTRAL]
+        news_failure_score:
+          type: number
+        news_failure_detail:
+          type: string
+        narrative_score:
+          type: number
+        narrative_detail:
+          type: string
+        contrarian_thesis:
+          type: string
+
+file_checks:
+  exists: true
+  min_size: 50

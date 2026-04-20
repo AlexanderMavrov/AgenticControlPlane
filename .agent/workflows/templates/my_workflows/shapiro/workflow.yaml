@@ -1,0 +1,638 @@
+name: shapiro
+version: 2
+description: >
+  Fully automated daily workflow for Shapiro contrarian analysis.
+  Runs the Python data pipeline, reads FT newsletters via Gmail MCP,
+  scores markets using COT positioning + news failures + narrative alignment,
+  updates memory, sends alerts for high-confidence setups, and generates
+  a comprehensive daily analysis report in Bulgarian.
+
+params:
+  - name: argus_root
+    description: "Absolute path to the Argus (ElliotWaveAnalyzer) repo on this machine"
+    required: false
+    default: "C:/Users/aleksandar.mavrov/Projects/ElliotWaveAnalyzer"
+
+  - name: watchlist
+    description: "Comma-separated list of symbols to analyze"
+    required: false
+    default: "EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,USTEC,US500,US30,US2000,DE40,FR40,JP225,XAUUSD,XAGUSD,XNGUSD,XBRUSD,BTCUSD,ETHUSD"
+
+  - name: lookback_days
+    description: "How many days back to search for FT newsletters in Gmail"
+    required: false
+    default: "3"
+
+  - name: notify
+    description: "If 'false', suppresses Pushover/Email delivery in send-alerts (dry-run)"
+    required: false
+    default: "true"
+
+tools:
+  - name: shapiro-runner
+    type: script
+    command: "cd {argus_root} && PYTHONUTF8=1 uv run python -m shapiro.runner"
+    description: >
+      Execute the Shapiro data pipeline. Fetches COT data, upcoming events,
+      and detects news failures. Outputs {argus_root}/data/shapiro_report.json.
+    input_schema:
+      type: object
+      properties: {}
+
+  - name: claude_ai_Gmail
+    type: mcp
+    required: true
+    expected_tools:
+      - search_threads
+      - get_thread
+
+gate:
+  structural: true
+  semantic: false
+  human: false
+  max_gate_retries: 5
+  max_step_retries: 3
+
+context:
+  carry_forward: summary
+
+steps:
+  # ──────────────────────────────────────────────
+  # Step 1: RUN-PIPELINE
+  # Execute the Python Shapiro data pipeline and
+  # stage its output into the workflow data dir.
+  # ──────────────────────────────────────────────
+  - name: run-pipeline
+    spec_check: false
+    subagent: true
+    model: haiku
+    tools: [shapiro-runner]
+    goal: >
+      Execute the Shapiro data pipeline, then stage its output for the workflow.
+
+      1. Invoke the shapiro-runner tool (no arguments). It runs:
+         cd {argus_root} && PYTHONUTF8=1 uv run python -m shapiro.runner
+
+      2. Verify the output file was created at:
+         {argus_root}/data/shapiro_report.json
+
+      3. Copy that file into the workflow data directory so downstream
+         steps can read it. Use Bash:
+            cp "{argus_root}/data/shapiro_report.json" \
+               ".agent/workflows/shapiro/data/shapiro-report.json"
+
+         (Windows note: "cp" works under bash on Windows. If it fails,
+          fall back to: copy /Y "<src>" "<dst>" in cmd, or use Python.)
+
+      4. If either the pipeline or the copy fails, report the error and stop.
+
+      The pipeline fetches, for every symbol in the watchlist ({watchlist}):
+      - COT (Commitments of Traders) percentiles
+      - Upcoming economic events
+      - News failure detection (price reactions vs. expectations)
+    outputs:
+      - path: data/shapiro-report.json
+        struct: shapiro-report
+
+  # ──────────────────────────────────────────────
+  # Step 2: LOAD-CONTEXT
+  # Read all context files and prepare summary
+  # ──────────────────────────────────────────────
+  - name: load-context
+    spec_check: false
+    subagent: true
+    model: haiku
+    goal: >
+      Read all Shapiro context files and prepare a consolidated context summary
+      for subsequent steps.
+
+      Files to read (all paths relative to {argus_root}/):
+
+      1. data/shapiro_report.json (REQUIRED) — Contains:
+         - generated_at: timestamp
+         - upcoming_events: array of economic events
+         - markets: object keyed by symbol, each with:
+           - cot_percentile: 0-100 number
+           - cot_crowding: "LONG" or "SHORT" or "NEUTRAL"
+           - shapiro_bias: "BULLISH" or "BEARISH" or "NEUTRAL"
+           - news_failures: array of failure objects
+
+      2. data/shapiro_memory.md (OPTIONAL, may not exist on first run) — Contains:
+         - Previous run timestamp
+         - Active setups from last run
+         - Key observations
+         - Items to watch
+
+      3. data/narratives/*.md (OPTIONAL, may not exist yet) — Contains:
+         - Per-symbol narrative files with consensus direction, strength, key drivers
+
+      Produce a context summary (JSON) that includes:
+      - pipeline_generated_at: timestamp from shapiro_report.json
+      - cot_extreme_count: number of markets with COT percentile >=80 or <=20
+      - markets_with_failures: array of symbol strings that have news failures
+      - memory_exists: true/false
+      - memory_highlights: brief summary if memory exists, else null
+      - narrative_files: array of objects, each with:
+          - symbol: string
+          - last_updated: YYYY-MM-DD
+          - days_since_update: integer
+
+      Output: Write the context summary JSON to the output file.
+    inputs:
+      - path: data/shapiro-report.json
+        inject: file
+    outputs:
+      - path: data/context-summary.json
+        struct: context-summary
+
+  # ──────────────────────────────────────────────
+  # Step 3: ANALYZE-NEWSLETTERS
+  # Search Gmail for FT newsletters, update narratives
+  # ──────────────────────────────────────────────
+  - name: analyze-newsletters
+    spec_check: false
+    subagent: true
+    tools: [claude_ai_Gmail]
+    goal: >
+      Search Gmail for Financial Times newsletters, analyze them, and update
+      per-symbol narrative files.
+
+      WATCHLIST for symbol mapping: {watchlist}
+
+      STEP A — SEARCH GMAIL:
+      1. Use the Gmail search_threads tool to search for: label:FT-Newsletters
+         Filter to newsletters from the last {lookback_days} days.
+      2. Use get_thread to read the FULL content of each found newsletter thread.
+      3. Dedupe: if a thread_id matches one already recorded in
+         {argus_root}/data/narratives/_processed_threads.json (if it exists),
+         skip it. At the end, append all newly-processed thread_ids to that file.
+
+      STEP B — ANALYZE NEWSLETTERS:
+      For each newsletter, identify mentions of watchlist symbols. Also identify
+      indirect references (e.g., "dollar weakness" affects USD pairs,
+      "gold rally" affects XAUUSD, "tech selloff" affects USTEC/US500).
+
+      STEP C — UPDATE NARRATIVE FILES:
+      For each affected symbol, update or create the narrative file at:
+      {argus_root}/data/narratives/{SYMBOL}.md
+
+      Each narrative file MUST follow this EXACT format:
+
+      ```markdown
+      # {SYMBOL} Narrative
+      **Last updated:** {YYYY-MM-DD}
+
+      ## Current Narrative
+      {1-2 sentences summarizing the current market story for this symbol}
+
+      ## Consensus
+      - **Direction:** BULLISH / BEARISH / NEUTRAL
+      - **Strength:** {0.0-1.0, where 1.0 = unanimous consensus}
+
+      ## Key Drivers
+      - {driver 1} *(source: {newsletter name}, {YYYY-MM-DD})*
+      - {driver 2} *(source: {newsletter name}, {YYYY-MM-DD})*
+
+      ## Source Contributions
+      Кой FT newsletter какво е допринесъл за narrative-а (помага да се оцени
+      стойността на всеки subscription):
+
+      | Дата | Newsletter | Принос |
+      |------|-----------|--------|
+      | {YYYY-MM-DD} | {newsletter name} | {конкретно какво НОВО е добавил: нов driver, промяна на consensus, потвърждение, или само споменаване} |
+
+      Правила за тази таблица:
+      - "Принос" — опиши конкретно какво ново е добавил този newsletter:
+        нов driver, промяна на consensus, потвърждение, или само споменаване
+        без нова информация.
+      - Маркирай newsletters с висока стойност (нов driver, промяна на
+        consensus) vs. такива, които просто повтарят известното.
+      - Когато обновяваш narrative, ДОБАВИ нов ред в таблицата — НЕ изтривай
+        старите редове. Таблицата е audit trail на приноса през времето.
+
+      ## History
+      - {YYYY-MM-DD}: {change description} *(source: {newsletter name})*
+      ```
+
+      NARRATIVE FRESHNESS RULES:
+      - If a narrative file was last updated > 7 days ago: mark it STALE
+        by prepending "**[STALE]**" to the Current Narrative section
+      - If new FT content contradicts the existing narrative: REPLACE the
+        Current Narrative and Consensus entirely (keep History AND Source
+        Contributions for audit trail — never delete rows from those)
+      - If COT positioning has reversed since last narrative: re-evaluate
+        and update the Consensus direction and strength
+      - Maintain narratives for ALL watchlist symbols mentioned (not just
+        extreme COT). Scoring focuses on extreme COT, but narratives are
+        maintained broadly so consensus data is available whenever a market
+        becomes extreme.
+
+      STEP D — PRODUCE OUTPUT:
+      Write a JSON summary listing all updated narrative files with:
+      - symbol: the market symbol
+      - action: "created" | "updated" | "marked_stale" | "unchanged"
+      - consensus_direction: current direction
+      - consensus_strength: current strength number
+      - newsletters_processed: count of newsletters that mentioned this symbol
+
+      Output: Write the newsletter analysis summary JSON to the output file.
+    inputs:
+      - path: data/context-summary.json
+        inject: file
+    outputs:
+      - path: data/newsletter-analysis.json
+        struct: newsletter-analysis
+
+  # ──────────────────────────────────────────────
+  # Step 4: SCORE-MARKETS
+  # Compute Shapiro contrarian scores
+  # ──────────────────────────────────────────────
+  - name: score-markets
+    spec_check: false
+    subagent: true
+    model: sonnet
+    goal: >
+      Compute Shapiro contrarian scores for every symbol in the watchlist.
+
+      WATCHLIST: {watchlist}
+
+      THE SHAPIRO FRAMEWORK:
+      Process: Identify narrative -> Assess positioning (COT) -> Confirm with
+      news -> Observe price reaction
+      Formula: Crowded Market + Supporting News + Unexpected Price Response =
+      Reversal Opportunity
+
+      For each market, compute the TOTAL SCORE (0-100) from three components.
+
+      === COT COMPONENT (0-40 points) ===
+      Based on cot_percentile from shapiro_report.json:
+      - Percentile >= 90 OR <= 10:  40 points
+      - Percentile >= 85 OR <= 15:  35 points
+      - Percentile >= 80 OR <= 20:  30 points
+      - Percentile 70-79 OR 21-30:  15 points
+      - Percentile 31-69:            0 points — SKIP THIS MARKET ENTIRELY
+
+      IMPORTANT: If COT score is 0, the market is SKIPPED. Do not include it.
+
+      === NEWS FAILURE COMPONENT (0-35 points) ===
+      Based on news_failures array from shapiro_report.json:
+      - STRONG failure (price reaction < 0.25 ATR):       35 points
+      - REVERSE failure (price moved opposite to surprise direction): 35 points
+      - MODERATE failure (price reaction < 0.5 ATR):      25 points
+      - PENDING failure (candle not yet closed):          10 points
+        (preliminary signal, NOT confirmed — lower than MODERATE)
+      - Multiple failures in last 5 days:                 +5 bonus (cap 35)
+      - No qualifying events:                              0 points (does NOT disqualify)
+
+      When multiple failures exist, use the HIGHEST scoring one as the base.
+
+      === FT NARRATIVE COMPONENT (0-25 points) — CONTRARIAN SCORING ===
+      Based on narrative files. Scores how ALIGNED the FT consensus is with
+      the CROWD (COT positioning). Strong consensus aligned with crowd =
+      higher contrarian opportunity.
+
+      - Consensus strength > 0.8 AND direction aligned with COT crowd: 25 points
+      - Consensus strength 0.6-0.8 AND direction aligned with COT crowd: 15 points
+      - Consensus strength < 0.6 OR neutral:              0 points
+      - No narrative data available:                       0 points (does NOT disqualify)
+
+      "Aligned with crowd" means:
+      - COT crowding is LONG and consensus direction is BULLISH, OR
+      - COT crowding is SHORT and consensus direction is BEARISH
+
+      === TOTAL SCORE & CONFIDENCE ===
+      Total = COT + News Failure + Narrative (0-100)
+
+      Confidence levels:
+      - 85-100: CONVICTION
+      - 70-84:  HIGH
+      - 50-69:  MEDIUM
+      - Below 50: LOW
+
+      === INCLUSION RULE ===
+      Include a market in `results` if EITHER:
+      1. total_score >= 50 (MEDIUM/HIGH/CONVICTION) — include_reason: "scored"
+      2. cot_percentile >= 90 OR <= 10 (EXTREME positioning) — even if the
+         total score is below 50. include_reason: "extreme_cot"
+
+      This exposes extreme-COT markets to the daily report so the write-analysis
+      step can flag them as "⚠️ EXTREME COT — наблюдение".
+
+      === BIAS DETERMINATION ===
+      The Shapiro bias is CONTRARIAN to the crowd:
+      - If COT crowding is LONG -> bias is BEARISH (fade the crowd)
+      - If COT crowding is SHORT -> bias is BULLISH (fade the crowd)
+
+      === OUTPUT FORMAT ===
+      Produce a JSON object with:
+      - scored_at: ISO timestamp
+      - markets_analyzed: total count of watchlist markets
+      - markets_qualifying: count with score >= 50
+      - markets_extreme_cot: count with cot_percentile >=90 or <=10
+      - results: array sorted by total_score descending (extreme_cot markets
+        with score < 50 come LAST), each with:
+        - symbol, total_score, confidence, bias
+        - include_reason: "scored" | "extreme_cot"
+        - cot_score, cot_percentile, cot_crowding
+        - news_failure_score, news_failure_detail
+        - narrative_score, narrative_detail
+        - contrarian_thesis: 2-3 sentence thesis in Bulgarian
+
+      Output: Write the scoring results JSON to the output file.
+    inputs:
+      - path: data/shapiro-report.json
+        inject: file
+      - path: data/newsletter-analysis.json
+        inject: file
+    outputs:
+      - path: data/scoring-result.json
+        struct: scoring-result
+
+  # ──────────────────────────────────────────────
+  # Step 5: UPDATE-MEMORY
+  # Write updated shapiro_memory.md
+  # ──────────────────────────────────────────────
+  - name: update-memory
+    spec_check: false
+    subagent: true
+    model: sonnet
+    goal: >
+      Update the Shapiro memory file with results from the current run.
+
+      Read the scoring results and write an updated memory file to BOTH:
+      A) {argus_root}/data/shapiro_memory.md  (the canonical location)
+      B) data/shapiro-memory-snapshot.md       (workflow gate-validated snapshot)
+
+      Both files MUST have identical content.
+
+      The memory file MUST follow this EXACT format (written in Bulgarian):
+
+      ```markdown
+      # Shapiro Памет
+      **Последен run:** {YYYY-MM-DD HH:MM UTC}
+
+      ## Активни Сетъпи
+      - {SYMBOL}: Score {X} ({CONFIDENCE}) — {BIAS}, {brief description of the setup}
+      {repeat for each market with score >= 50, sorted by score descending}
+
+      ## Ключови Наблюдения
+      - {observation 1 — e.g., "COT extreme в EURUSD за 3-та поредна седмица"}
+      - {observation 2 — e.g., "News failure в XAUUSD след NFP данните"}
+      {key observations from this run}
+
+      ## За Утре
+      - {upcoming event 1 to watch — from upcoming_events in shapiro_report.json}
+      - {upcoming event 2}
+      {events in the next 24-48 hours that could trigger new failures}
+
+      ## Промени от Предишния Run
+      - {change 1 — e.g., "USDJPY: Score 72 -> 85 (нов news failure)"}
+      - {change 2 — e.g., "GBPUSD: Отпаднал (COT вече не е extreme)"}
+      {compare with previous memory if it existed, otherwise note "Първи run"}
+      ```
+
+      If previous memory exists ({argus_root}/data/shapiro_memory.md), compare:
+      - New setups that appeared
+      - Setups that dropped off
+      - Score changes for continuing setups
+
+      After writing A, verify it exists on disk (stat/ls) and is non-empty.
+      If verification fails, report the error and STOP — do not write snapshot.
+    inputs:
+      - path: data/scoring-result.json
+        inject: file
+      - path: data/shapiro-report.json
+        inject: file
+    outputs:
+      - path: data/shapiro-memory-snapshot.md
+
+  # ──────────────────────────────────────────────
+  # Step 6: SEND-ALERTS
+  # Pushover + Email for high-confidence setups
+  # ──────────────────────────────────────────────
+  - name: send-alerts
+    spec_check: false
+    subagent: true
+    model: haiku
+    goal: >
+      Send alerts for all markets with Shapiro score >= 70 (HIGH or CONVICTION).
+
+      If the "notify" param is "false": compose the alerts summary as usual
+      but DO NOT actually send anything via Pushover/Email. Mark
+      "dry_run": true in the output summary. (Useful for testing.)
+
+      Read the scoring results. For each qualifying market:
+
+      1. Determine alert priority:
+         - CONVICTION (score 85-100): Pushover priority = 1 (high)
+         - HIGH (score 70-84): Pushover priority = 0 (normal)
+
+      2. Compose the alert:
+         - Title: "SHAPIRO: {SYMBOL} {BIAS} (Score: {SCORE})"
+         - Body: confidence level, COT percentile & crowding, news failure
+           details, narrative alignment, contrarian thesis (1-2 sentences)
+
+      3. If notify != "false", send via the notification system. Execute this
+         Python one-liner via Bash for each alert (use the EXACT API shown —
+         explicit creds in constructor, named args in send):
+
+         ```
+         cd {argus_root} && PYTHONUTF8=1 uv run python -c "
+         from shapiro.notifier import PushoverNotifier, EmailNotifier
+         from shapiro.config import ShapiroConfig
+         cfg = ShapiroConfig.from_env()
+         title = 'SHAPIRO: <SYMBOL> <BIAS> (Score: <SCORE>)'
+         body  = '<DETAILS>'
+         p = PushoverNotifier(cfg.PUSHOVER_USER, cfg.PUSHOVER_TOKEN)
+         p.send(title=title, message=body, priority=<0 or 1>)
+         e = EmailNotifier(cfg.NOTIFY_EMAIL, cfg.GMAIL_APP_PASSWORD)
+         e.send(subject=title, body=body)
+         "
+         ```
+
+         If any notifier call raises an exception, record it in the output
+         as {symbol, channel, error} but CONTINUE with remaining alerts.
+
+      4. If no markets qualify (score >= 70), write a summary noting
+         "No high-confidence setups — no alerts sent." (alerts_sent: 0).
+
+      Output JSON summary with:
+      - sent_at: ISO timestamp
+      - dry_run: boolean (true if notify=false)
+      - alerts_sent: count successfully delivered (0 if dry run)
+      - alerts: array of {symbol, bias, score, priority, pushover_status, email_status}
+      - delivery_errors: array of {symbol, channel, error} (empty if all ok)
+    inputs:
+      - path: data/scoring-result.json
+        inject: file
+    outputs:
+      - path: data/alerts-summary.json
+        struct: alerts-summary
+
+  # ──────────────────────────────────────────────
+  # Step 7: WRITE-ANALYSIS
+  # Generate daily analysis report in Bulgarian
+  # ──────────────────────────────────────────────
+  - name: write-analysis
+    spec_check: false
+    subagent: true
+    model: sonnet
+    goal: >
+      Generate the comprehensive Shapiro daily analysis report in BULGARIAN.
+
+      Write the report to BOTH:
+      A) {argus_root}/data/shapiro_daily_analysis.md  (canonical)
+      B) data/shapiro-daily-analysis.md                 (gate-validated snapshot)
+
+      Both files MUST have identical content.
+
+      === WHICH MARKETS TO INCLUDE ===
+      Include a market in this report if EITHER:
+      1. Its total_score >= 50 (MEDIUM / HIGH / CONVICTION), OR
+      2. Its cot_percentile >= 90 OR <= 10 (EXTREME COT) — even if score < 50.
+         Mark these with "⚠️ EXTREME COT (score {X} — наблюдение)" after the
+         confidence level. EXTREME positioning alone is a significant signal
+         worth monitoring even without news failure or narrative confirmation.
+
+      Sort included markets by total_score DESCENDING. EXTREME COT markets
+      with score < 50 come after all scored markets.
+
+      === REPORT FORMAT (follow EXACTLY) ===
+
+      ```markdown
+      # SHAPIRO ДНЕВЕН АНАЛИЗ
+
+      **Run:** {YYYY-MM-DD HH:MM UTC} | **Пазари с COT extreme:** {count}
+
+      ---
+
+      ## Оценени Пазари
+
+      {For each included market (scored >= 50 OR extreme COT), in sort order:}
+
+      ### {SYMBOL} — {BIAS} — Score: {TOTAL}/100 — {CONFIDENCE}
+
+      {If this market is included via EXTREME COT rule with score < 50,
+       append right after the confidence: "⚠️ EXTREME COT (score {X} — наблюдение)"}
+
+      | Компонент | Точки | Детайли |
+      |-----------|-------|---------|
+      | COT | {X}/40 | Спекуланти {percentile}% ({crowding}) — {1-2 изр. какво означава това за пазара} |
+      | News Failure | {X}/35 | {Обясни: колко failures, кои събития, какви бяха изненадите и как реагира цената. Ако няма: "Няма qualifying събития в последните 5 дни"} |
+      | Наратив | {X}/25 | {Обясни какъв е медийният консенсус и защо подкрепя/не подкрепя контрариан тезата. Ако няма: "Няма данни"} |
+
+      **Контрариан теза:** {2-3 изречения на разбираем език — обясни ЗАЩО
+      crowd-ът може да е грешен. Не приемай, че читателят разбира фундаментален
+      анализ — обясни причинно-следствените връзки.}
+
+      #### Какво може да провали тезата (Рискове)
+
+      Описвай само събития/фактори, които ако се случат биха ПОДКРЕПИЛИ
+      crowd-а и ОБЕЗСИЛИЛИ контрариан позицията. Т.е. при BEARISH bias —
+      какво би изпратило цената НАГОРЕ (против предикшъна).
+
+      | Дата/Час (UTC) | Събитие/Фактор | Какво е? | Страна | Очакв. | Какво би навредило на тезата |
+      |----------------|---------------|---------|--------|--------|------------------------------|
+      | {YYYY-MM-DD HH:MM or "—"} | {event/factor} | {1 изр. обяснение} | {US/EU/AU/…/"—"} | {forecast or "—"} | {marker} {2-3 изр. ЗАЩО това влияе + механизма} |
+
+      #### Какво подкрепя тезата (Потвърждения)
+
+      Описвай събития/фактори, които биха ПОДКРЕПИЛИ контрариан позицията
+      и биха ПРИНУДИЛИ crowd-а да капитулира. Включи и потенциални
+      **news failures** — ситуации, в които новина подкрепя crowd-а, но
+      цената НЕ реагира.
+
+      | Дата/Час (UTC) | Събитие/Фактор | Какво е? | Страна | Очакв. | Какво би подкрепило тезата |
+      |----------------|---------------|---------|--------|--------|---------------------------|
+      | {YYYY-MM-DD HH:MM or "—"} | {event/factor} | {1 изр. обяснение} | {country or "—"} | {forecast or "—"} | {marker} {2-3 изр. ЗАЩО + механизма} |
+      | {date/time} | **News Failure:** {event} | {explanation} | {country} | {forecast} | {marker} {какъв сценарий би генерирал failure} |
+
+      {Only for markets with score >= 65:}
+      #### News Failures
+
+      | Дата/Час (UTC) | Събитие | Какво е? | Страна | Очаквано | Реално | Движение (ATR) | Сила |
+      |----------------|---------|---------|--------|----------|--------|----------------|------|
+      | {YYYY-MM-DD HH:MM} | {event} | {1 изр.} | {country} | {expected} | {actual} | {0.NN} | {STRONG/REVERSE/MODERATE/PENDING} |
+
+      ---
+      {end of per-market sections}
+
+      ## Предстоящи Събития
+
+      | Дата/Час (UTC) | Събитие | Какво е? | Страна | Засегнати Пазари |
+      |----------------|---------|---------|--------|-----------------|
+      | {YYYY-MM-DD HH:MM} | {event} | {1 изр.} | {country} | {comma-separated symbols} |
+
+      ---
+
+      ## Обновяване на Паметта
+
+      {Summary of changes from previous run — new setups, dropped setups,
+       score changes. If first run: "Първи run — няма предишни данни."}
+      ```
+
+      === TABLE COLUMN RULES (Рискове + Потвърждения) ===
+
+      - "Какво е?" — 1 изречение, обясняващо събитието на достъпен език.
+        Примери:
+          NFP → "Брой нови работни места в САЩ (без селското стопанство).
+                 Ключов индикатор за пазара на труда."
+          ISM Manufacturing PMI → "Индекс на производствената активност.
+                                   Над 50 = растеж, под 50 = свиване."
+          CPI YoY → "Годишна инфлация — промяна на потребителските цени
+                     спрямо миналата година."
+        За геополитически/макро фактори без конкретно събитие → "—"
+
+      - "Очакв." — forecast стойност от upcoming events (ако я има),
+        иначе "—"
+
+      - "Дата/Час (UTC)" — геополитически фактори без конкретна дата → "—"
+
+      - Маркер за значимост — всяко описание в последната колона започва
+        с маркер (emoji + bold label):
+          ⚡ **Критично.**  — може самостоятелно да обърне/потвърди целия
+                             сетъп (NFP, CPI, решение на централна банка)
+          📊 **Умерено.**   — може да повлияе, но рядко обръща самостоятелно
+                             (PMI, Retail Sales, Trade Balance)
+          📎 **Фоново.**    — контекст, не катализатор (геополитика,
+                             sentiment shifts, речи без конкретика)
+
+      - Описания след маркера — 2-3 изречения. Обясни ЗАЩО това събитие
+        влияе на валутната двойка и КАКЪВ е механизмът. Не приемай, че
+        читателят знае фундаментален анализ.
+
+      - News Failure редове (само в таблицата за подкрепа) — маркирай с
+        **News Failure:** в колоната "Събитие/Фактор". Опиши сценарий,
+        който би генерирал failure (новина в полза на crowd-а, но цена
+        не реагира).
+
+      === GLOBAL RULES ===
+
+      - ALL text in BULGARIAN. Технически термини (COT, ATR, Shapiro,
+        NFP, CPI, PMI) остават на английски.
+      - Include markets where total_score >= 50 OR (cot_percentile >= 90
+        OR <= 10). Sort by score DESC; EXTREME-only markets come last.
+      - News Failures таблицата се появява само за markets с score >= 65.
+      - Be specific and data-driven in the contrarian thesis — reference
+        actual numbers from shapiro_report.json.
+      - За всеки пазар задължително опиши какви предстоящи събития или
+        фактори могат да обърнат контрариан тезата (Рискове таблицата не
+        може да е празна — минимум 1 ред, дори "—" за дата ако е само
+        фонов фактор).
+
+      === VERIFICATION ===
+
+      After writing A ({argus_root}/data/shapiro_daily_analysis.md), verify
+      it exists and is non-empty (stat/ls). If verification fails, STOP and
+      report the error — do not write snapshot B.
+    inputs:
+      - path: data/scoring-result.json
+        inject: file
+      - path: data/shapiro-report.json
+        inject: file
+      - path: data/newsletter-analysis.json
+        inject: file
+      - path: data/shapiro-memory-snapshot.md
+        inject: file_if_exists
+    outputs:
+      - path: data/shapiro-daily-analysis.md

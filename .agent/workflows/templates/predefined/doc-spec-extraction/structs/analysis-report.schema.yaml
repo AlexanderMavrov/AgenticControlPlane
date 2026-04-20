@@ -1,0 +1,100 @@
+name: analysis-report
+description: >
+  Output of the ANALYZE step — deep document analysis with discovered
+  requirements, domains, existing spec status, and proposed placement.
+  Reviewed and approved by user via human gate before extraction begins.
+format: json
+
+json_schema:
+  required_fields:
+    - field: workflow
+      type: string
+    - field: source_document
+      type: string
+    - field: analyzed_at
+      type: string
+    - field: target_scope
+      type: string
+      description: >
+        Scope id (e.g., "astro", "generic") where extracted specs will be
+        written. Resolved from the workflow's --scope param or active scope.
+        Surfaced in the human gate so the user can reject if wrong.
+    - field: scope_source
+      type: string
+      description: >
+        Where the target_scope came from, for UX clarity. One of:
+        "cli param", "active scope (user override)",
+        "active scope (project default)", "fallback (generic)".
+    - field: target_directory
+      type: string
+      description: >
+        Absolute-from-project-root path: ".agent/specs/<target_scope>/".
+        Destination of all EXTRACT/COMMIT writes.
+    - field: focus
+      type: string
+    - field: understanding_summary
+      type: string
+    - field: domains
+      type: array
+      min_items: 1
+    - field: domains[].name
+      type: string
+    - field: domains[].abbreviation
+      type: string
+      pattern: "^[A-Z]{2,4}$"
+    - field: domains[].description
+      type: string
+    - field: domains[].status
+      type: string
+      enum: [pending, completed]
+      description: >
+        MUST be "pending" when writing the analysis report. The EXTRACT step
+        changes domains to "completed" after processing. The ANALYZE step
+        always sets this to "pending" — it means "pending extraction",
+        not "analysis complete".
+    - field: domains[].requirements
+      type: array
+      min_items: 1
+    - field: domains[].requirements[].title
+      type: string
+    - field: domains[].requirements[].severity
+      type: string
+      enum: [MUST, SHOULD, MAY]
+    - field: domains[].requirements[].source_sections
+      type: array
+    - field: domains[].requirements[].related_requirements
+      type: array
+    - field: domains[].requirements[].proposed_spec_id
+      type: string
+    - field: domains[].existing_specs
+      type: array
+    - field: domains[].mode
+      type: string
+      enum: [create, merge, mixed]
+    - field: domains[].estimated_new_specs
+      type: number
+    - field: domains[].estimated_updated_specs
+      type: number
+    - field: discrepancies
+      type: array
+    - field: ambiguities
+      type: array
+    - field: cross_domain_dependencies
+      type: array
+    - field: spec_mapping
+      type: array
+    - field: spec_mapping[].existing_spec_id
+      type: string
+    - field: spec_mapping[].proposed_spec_id
+      type: string
+      description: >
+        The proposed spec ID that covers this existing spec, or "__NONE__"
+        if no proposed spec covers it (out-of-scope, different source
+        document, merged into another spec). Use "__NONE__" instead of
+        null — the field is required as a string.
+    - field: spec_mapping[].reason
+      type: string
+
+file_checks:
+  exists: true
+  min_size: 200

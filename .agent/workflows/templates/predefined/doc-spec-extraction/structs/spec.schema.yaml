@@ -1,0 +1,48 @@
+name: spec
+description: >
+  Behavioral specification extracted from documentation.
+  YAML frontmatter + Markdown body. One file per requirement.
+  Frontmatter contains metadata, body contains the full spec
+  with required sections.
+format: markdown
+
+frontmatter:
+  required:
+    - field: spec_id
+      type: string
+      pattern: '^[A-Z]+-\d{3}$'
+    - field: title
+      type: string
+    - field: severity
+      type: enum
+      values: [MUST, SHOULD, MAY]
+      body_match_section: "Rule Statement"
+    - field: domain
+      type: string
+    - field: source_sections
+      type: list
+    - field: related_specs
+      type: list
+  optional:
+    - field: scope
+      type: list
+      description: >
+        Scopes the spec applies to (e.g., ["astro"], ["ares"], ["generic"]).
+        Optional for backwards compatibility with pre-scoping specs — when
+        absent, the spec is treated as belonging to the "generic" scope.
+        New specs should always declare their scope(s). Cross-reference
+        grammar in related_specs: "NVRM-002" (same scope), "astro:NVRM-002"
+        (cross-scope short), "astro/nvram/NVRM-002" (cross-scope full path).
+
+required_sections:
+  - "Rule Statement"
+  - "Rationale"
+  - "Valid Examples"
+  - "Invalid Examples"
+  - "Validation Criteria"
+  - "Source Reference"
+
+file_checks:
+  exists: true
+  min_size: 200
+  name_pattern: '^[A-Z]+-\d{3}\.md$'

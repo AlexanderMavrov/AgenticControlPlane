@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "extras": [
+    {
+      "src": "extras/tools/visual-qa.html",
+      "dst": ".agent/tools/visual-qa.html"
+    },
+    {
+      "src": "extras/tools/visual-qa-report.html",
+      "dst": ".agent/tools/visual-qa-report.html"
+    },
+    {
+      "src": "extras/docs/visual-qa-rules.md",
+      "dst": ".agent/docs/visual-qa-rules.md"
+    }
+  ]
+}
